@@ -34,6 +34,7 @@ type IncomingJsonRPCRequest struct {
 	Params  []interface{} `json:"params"`
 	JsonRPC string        `json:"jsonrpc"`
 }
+
 type JsonRPCError struct {
 	Code    int
 	Message string
