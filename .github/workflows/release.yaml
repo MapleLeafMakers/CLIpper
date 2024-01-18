@@ -22,7 +22,7 @@ jobs:
       - name: Set APP_VERSION env
         run: echo APP_VERSION=$(echo ${GITHUB_REF} | rev | cut -d'/' -f 1 | rev ) >> ${GITHUB_ENV}
 
-      - uses: wangyoucao577/go-release-action@v1.16
+      - uses: wangyoucao577/go-release-action@v1.42
         with:
           goversion: "1.21"
           github_token: ${{ secrets.GITHUB_TOKEN }}
