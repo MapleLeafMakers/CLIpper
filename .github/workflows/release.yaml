@@ -29,4 +29,5 @@ jobs:
           goos: ${{ matrix.goos }}
           goarch: ${{ matrix.goarch }}
           build_flags: -v
+          binary_name: clipper
           ldflags: -X "main.version=${{ env.APP_VERSION }}" -X "main.commit=${{ github.sha }}"
