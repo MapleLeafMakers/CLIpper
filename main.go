@@ -14,7 +14,7 @@ var commit = ""
 func main() {
 	versionString := version
 	if commit != "" {
-		versionString = versionString + "-" + commit
+		versionString = versionString + "-" + commit[:7]
 	}
 	// Initialize JSON-RPC WebSocket jsonrpcclient
 	rpcClient := jsonrpcclient.NewClient("ws://trident/websocket")
