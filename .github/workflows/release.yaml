@@ -31,6 +31,7 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           goos: ${{ matrix.goos }}
           goarch: ${{ matrix.goarch }}
+          md5sum: false
           build_flags: -v
           binary_name: clipper
           ldflags: -X "main.version=${{ env.APP_VERSION }}" -X "main.commit=${{ github.sha }}"
