@@ -91,12 +91,11 @@ func (c *Client) readMessages() {
 		json.Unmarshal([]byte(message), &payload)
 		if id, ok := payload["id"].(string); ok {
 			response := JsonRPCResponse{ID: id, Result: payload["result"]}
-			if error, ok := payload["error"].(map[string]interface{}); ok {
-				log.Fatalf("%+v", error)
+			if err, ok := payload["error"].(map[string]interface{}); ok {
 				response.Error = JsonRPCError{
-					Code:    int(error["code"].(float64)),
-					Message: error["message"].(string),
-					Data:    error["data"],
+					Code:    int(err["code"].(float64)),
+					Message: err["message"].(string),
+					Data:    err["data"],
 				}
 			}
 			c.responseMutex.Lock()
@@ -110,8 +109,9 @@ func (c *Client) readMessages() {
 			// incoming request
 
 			req := IncomingJsonRPCRequest{
-				Method: method,
-				Params: payload["params"].([]interface{}),
+				Method:  method,
+				Params:  payload["params"].([]interface{}),
+				JsonRPC: "2.0",
 			}
 			c.Incoming <- req
 		}

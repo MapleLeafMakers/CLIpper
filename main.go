@@ -8,7 +8,14 @@ import (
 	"os"
 )
 
+var version = "?"
+var commit = ""
+
 func main() {
+	versionString := version
+	if commit != "" {
+		versionString = versionString + "-" + commit
+	}
 	// Initialize JSON-RPC WebSocket jsonrpcclient
 	rpcClient := jsonrpcclient.NewClient("ws://trident/websocket")
 	defer rpcClient.Close()
@@ -19,7 +26,7 @@ func main() {
 
 	// Load some text for our viewport
 
-	tui := ui.NewTUI(rpcClient)
+	tui := ui.NewTUI(rpcClient, versionString)
 	//tui.Send(tea.QuitMsg{})
 	if _, err := tui.Run(); err != nil {
 		fmt.Println("could not run program:", err)
