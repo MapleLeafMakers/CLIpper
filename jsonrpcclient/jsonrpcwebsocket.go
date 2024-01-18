@@ -86,9 +86,9 @@ func (c *Client) readMessages() {
 			c.Connect()
 			return
 		}
-		//log.Println(string(message))
+
 		var payload map[string]interface{}
-		json.Unmarshal([]byte(message), &payload)
+		json.Unmarshal(message, &payload)
 		if id, ok := payload["id"].(string); ok {
 			response := JsonRPCResponse{ID: id, Result: payload["result"]}
 			if err, ok := payload["error"].(map[string]interface{}); ok {

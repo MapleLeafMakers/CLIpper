@@ -51,10 +51,10 @@ type Model struct {
 }
 
 func formatTitle(output *termenv.Output, version string) string {
-	if matched, err := regexp.MatchString("^\\d+\\.\\d+\\.\\d+-[0-9a-f]{7}$", version); err == nil && matched {
+	if matched, err := regexp.MatchString("^v\\d+\\.\\d+\\.\\d+-[0-9a-f]{7}$", version); err == nil && matched {
 		version = strings.Split(version, "-")[0]
 	}
-	return output.String("🚣 CLIpper v" + version).Foreground(output.Color("#FFFF00")).String()
+	return output.String("🚣 CLIpper " + version).Foreground(output.Color("#FFFF00")).String()
 
 }
 
@@ -209,6 +209,18 @@ func (m *Model) cmdClear() {
 	m.Viewport.SetContent("")
 }
 
+func (m *Model) cmdRpc(rawArgs string) {
+	parts := strings.SplitN(rawArgs, " ", 2)
+	//log.Println(parts)
+	var params map[string]interface{}
+	json.Unmarshal([]byte(parts[1]), &params)
+	result := m.Client.Call(parts[0], params)
+	res, _ := json.MarshalIndent(result.Result, " ", " ")
+	if result.Result != nil {
+		m.AppendLog(LogEntry{timestamp: m.getLogTimestamp(), message: string(res)})
+	}
+
+}
 func (m *Model) processCommand(input string) {
 	split := strings.SplitN(input, " ", 2)
 	cmd := strings.ToLower(split[0])
@@ -221,6 +233,8 @@ func (m *Model) processCommand(input string) {
 		m.cmdSet(rawArgs)
 	case "clear":
 		m.cmdClear()
+	case "rpc":
+		m.cmdRpc(rawArgs)
 	}
 
 }
