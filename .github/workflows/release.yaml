@@ -34,4 +34,5 @@ jobs:
           md5sum: false
           build_flags: -v
           binary_name: clipper
+          extra_files: LICENSE.md README.md
           ldflags: -X "main.version=${{ env.APP_VERSION }}" -X "main.commit=${{ github.sha }}"

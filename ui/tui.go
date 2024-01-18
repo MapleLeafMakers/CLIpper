@@ -14,6 +14,7 @@ import (
 	"github.com/muesli/termenv"
 	"os"
 	"reflect"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -46,10 +47,15 @@ type Model struct {
 
 	inputStyle    lipgloss.Style
 	viewportStyle lipgloss.Style
+	gcodeHelp     map[string]string
 }
 
 func formatTitle(output *termenv.Output, version string) string {
-	return output.String("🚣 CLIpper").Foreground(output.Color("#FFFF00")).String() + " " + version
+	if matched, err := regexp.MatchString("^\\d+\\.\\d+\\.\\d+-[0-9a-f]{7}$", version); err == nil && matched {
+		version = strings.Split(version, "-")[0]
+	}
+	return output.String("🚣 CLIpper v" + version).Foreground(output.Color("#FFFF00")).String()
+
 }
 
 func NewTUI(client *jsonrpcclient.Client, version string) *tea.Program {
@@ -60,9 +66,21 @@ func NewTUI(client *jsonrpcclient.Client, version string) *tea.Program {
 		output:         output,
 		formattedTitle: formatTitle(output, version),
 	}
+
 	model.LoadOptions()
 	program := tea.NewProgram(model)
 	return program
+}
+
+func (m *Model) LoadHelp() {
+	response := m.Client.Call("printer.gcode.help", map[string]interface{}{})
+	v, ok := response.Result.(map[string]interface{})
+	if !ok {
+		panic(fmt.Sprintf("OHNOES %+v", response.Result))
+	}
+	for cmd, _ := range v {
+		m.Input.TabComplete.RegisterCompletion(cmdinput.NewStringCompleter(cmd))
+	}
 }
 
 func (m *Model) generateStyles() {
@@ -221,6 +239,7 @@ func (m *Model) RegisterCompleters() {
 		cmdinput.NewStringCompleter("/set"),
 		cmdinput.NewListCompleter(optionKeys...),
 	)
+
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -264,7 +283,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.Viewport.SetContent(m.renderContent())
 			m.Input = cmdinput.New()
 			m.RegisterCompleters()
-			m.Input.TextInput.Width = msg.Width - 40
+			m.LoadHelp()
+			m.Input.TextInput.Width = msg.Width - 4
 			m.Ready = true
 			cmds = append(cmds, m.readIncoming())
 

@@ -5,7 +5,6 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/google/shlex"
 	"sort"
-	"strconv"
 	"strings"
 )
 
@@ -108,7 +107,7 @@ func (m *Model) autoComplete() {
 	if err != nil {
 		panic("Probably need to handle incomplete quoted strings or something crazy")
 	}
-	if strings.HasSuffix(rawInput, " ") {
+	if strings.HasSuffix(rawInput, " ") || rawInput == "" {
 		// if the input ended with a space we're starting the next (empty) token
 		tokens = append(tokens, "")
 	}
@@ -156,7 +155,7 @@ func longestCommonPrefix(strs []string) string {
 }
 
 func (m *Model) View() string {
-	return m.TextInput.View() + strconv.Itoa(m.tabPresses)
+	return m.TextInput.View() // + strconv.Itoa(m.tabPresses)
 }
 
 func (m Model) Value() string {

@@ -6,30 +6,46 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 )
 
 var version = "?"
 var commit = ""
 
-func main() {
+func StartInteractive(url string) {
 	versionString := version
 	if commit != "" {
 		versionString = versionString + "-" + commit[:7]
 	}
-	// Initialize JSON-RPC WebSocket jsonrpcclient
-	rpcClient := jsonrpcclient.NewClient("ws://trident/websocket")
+	rpcClient := jsonrpcclient.NewClient(url)
 	defer rpcClient.Close()
 
 	if err := rpcClient.Connect(); err != nil {
 		log.Fatalf("Failed to connect: %v", err)
 	}
 
-	// Load some text for our viewport
-
 	tui := ui.NewTUI(rpcClient, versionString)
-	//tui.Send(tea.QuitMsg{})
 	if _, err := tui.Run(); err != nil {
 		fmt.Println("could not run program:", err)
 		os.Exit(1)
 	}
+}
+
+func main() {
+	args := os.Args[1:]
+	var url string
+	switch len(args) {
+	case 2:
+		url = "ws://" + args[0] + ":" + string(args[1]) + "/websocket"
+	case 1:
+		if strings.Contains(args[0], "://") {
+			url = args[0]
+		} else {
+			url = "ws://" + args[0] + "/websocket"
+		}
+	default:
+		url = "ws://localhost/websocket"
+	}
+
+	StartInteractive(url)
 }
