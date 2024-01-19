@@ -3,16 +3,22 @@ package cmdinput
 import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/google/shlex"
 	"sort"
 	"strings"
 )
 
 type Model struct {
-	TextInput   textinput.Model
-	History     []string
-	HistoryPos  int
-	Completions []string
+	TextInput           textinput.Model
+	History             []string
+	HistoryPos          int
+	Completions         []string
+	CompletionPos       int
+	CompletionOptions   []string
+	CompletionRemainder string
+	CompletingFrom      string
+
 	tabPresses  int
 	TabComplete *TabComplete
 }
@@ -26,6 +32,7 @@ func New() Model {
 		TabComplete: &tc,
 	}
 	m.TextInput.Prompt = "> "
+
 	m.TextInput.Focus()
 
 	return m
@@ -86,62 +93,56 @@ func (m *Model) HistoryForward() {
 	m.TextInput.SetCursor(len(m.Value()))
 }
 
-func (m *Model) autoComplete() {
-	//prefix := m.TextInput.Value()[:m.TextInput.Position()]
-	//options := []string{}
-	//for _, c := range m.Completions {
-	//	if strings.HasPrefix(c, prefix) {
-	//		options = append(options, c)
-	//	}
-	//}
-	//
-	//if m.tabPresses == 1 {
-	//	lcp := longestCommonPrefix(options)
-	//	if len(lcp) > 0 {
-	//		m.TextInput.SetValue(lcp)
-	//		m.TextInput.SetCursor(len(lcp))
-	//	}
-	//}
-	rawInput := m.TextInput.Value()[:m.TextInput.Position()]
-	tokens, err := shlex.Split(rawInput)
+func splitToTokens(input string) []string {
+	tokens, err := shlex.Split(input)
 	if err != nil {
 		panic("Probably need to handle incomplete quoted strings or something crazy")
 	}
-	if strings.HasSuffix(rawInput, " ") || rawInput == "" {
+	if strings.HasSuffix(input, " ") || input == "" {
 		// if the input ended with a space we're starting the next (empty) token
 		tokens = append(tokens, "")
 	}
+	return tokens
+}
 
-	options := m.TabComplete.Complete(tokens[len(tokens)-1], tokens[:len(tokens)-1])
-	if len(options) == 0 {
-		return
-	}
-
+func (m *Model) autoComplete() {
 	if m.tabPresses == 1 {
-		//m.TextInput.SetValue(fmt.Sprintf("%+v", options))
-		//m.TextInput.SetCursor(len(m.TextInput.Value()))
-
+		rawInput := m.TextInput.Value()[:m.TextInput.Position()]
+		remainder := m.TextInput.Value()[m.TextInput.Position():]
+		tokens := splitToTokens(rawInput)
+		options := m.TabComplete.Complete(tokens[len(tokens)-1], tokens[:len(tokens)-1])
+		if len(options) == 0 {
+			return
+		}
 		lcp := longestCommonPrefix(options)
 		newContent := rawInput[:len(rawInput)-(len(tokens[len(tokens)-1]))] + lcp
-		if newContent != rawInput {
-			m.TextInput.SetValue(newContent)
-			m.TextInput.SetCursor(len(m.TextInput.Value()))
-			m.tabPresses = 0
-		}
+		m.CompletingFrom = rawInput[:len(rawInput)-(len(tokens[len(tokens)-1]))]
+		m.CompletionOptions = options
+		m.CompletionRemainder = remainder
+		m.TextInput.SetValue(newContent)
+		m.TextInput.SetCursor(len(m.TextInput.Value()))
+		m.TextInput.SetValue(newContent + remainder)
 	} else {
-		// 2nd tab press, initiates some kind of menu...
-
+		m.CompletionPos++
+		if m.CompletionPos >= len(m.CompletionOptions) {
+			m.CompletionPos = 0
+		}
+		newContent := m.CompletingFrom + m.CompletionOptions[m.CompletionPos]
+		m.TextInput.SetValue(newContent)
+		m.TextInput.SetCursor(len(m.TextInput.Value()))
+		m.TextInput.SetValue(newContent + m.CompletionRemainder)
+		m.tabPresses = 1
 	}
 }
 
 func longestCommonPrefix(strs []string) string {
-	var longestPrefix string = ""
+	var longestPrefix = ""
 	var endPrefix = false
 
 	if len(strs) > 0 {
 		sort.Strings(strs)
-		first := string(strs[0])
-		last := string(strs[len(strs)-1])
+		first := strs[0]
+		last := strs[len(strs)-1]
 
 		for i := 0; i < len(first); i++ {
 			if !endPrefix && string(last[i]) == string(first[i]) {
@@ -155,6 +156,7 @@ func longestCommonPrefix(strs []string) string {
 }
 
 func (m *Model) View() string {
+
 	return m.TextInput.View() // + strconv.Itoa(m.tabPresses)
 }
 
@@ -164,6 +166,10 @@ func (m Model) Value() string {
 
 func (m *Model) SetValue(value string) {
 	m.TextInput.SetValue(value)
+}
+
+func (m *Model) SetTextStyle(style lipgloss.Style) {
+	m.TextInput.TextStyle = style
 }
 
 func (m *Model) NewEntry() {

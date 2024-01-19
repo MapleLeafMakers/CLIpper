@@ -4,11 +4,12 @@ import (
 	"clipper/jsonrpcclient"
 	"clipper/ui/cmdinput"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"github.com/bykof/gostradamus"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/mattn/go-runewidth"
 	"github.com/muesli/reflow/ansi"
 	"github.com/muesli/reflow/wrap"
 	"github.com/muesli/termenv"
@@ -16,7 +17,6 @@ import (
 	"reflect"
 	"regexp"
 	"strings"
-	"time"
 )
 
 var ()
@@ -29,7 +29,13 @@ type LogEntry struct {
 type UIOptions struct {
 	LogIncoming     bool
 	TimestampFormat string
-	BorderColor     lipgloss.TerminalColor
+
+	BorderType       lipgloss.Border
+	BorderForeground lipgloss.TerminalColor
+	BorderBackground lipgloss.TerminalColor
+
+	InputForeground lipgloss.TerminalColor
+	InputBackground lipgloss.TerminalColor
 }
 
 type Model struct {
@@ -38,16 +44,23 @@ type Model struct {
 	Ready    bool
 	Viewport viewport.Model
 	Input    cmdinput.Model
-	Client   *jsonrpcclient.Client
-	output   *termenv.Output
-	Options  *UIOptions
+	TitleBar TitleBar
 
-	formattedTitle  string
+	Client  *jsonrpcclient.Client
+	output  *termenv.Output
+	Options *UIOptions
+
+	host            string
+	version         string
 	renderedContent string
 
-	inputStyle    lipgloss.Style
-	viewportStyle lipgloss.Style
-	gcodeHelp     map[string]string
+	inputBorderStyle    lipgloss.Style
+	viewportBorderStyle lipgloss.Style
+	inlineBorderStyle   lipgloss.Style
+	titleStyle          lipgloss.Style
+	inputTextStyle      lipgloss.Style // broken
+
+	gcodeHelp map[string]string
 }
 
 func formatTitle(output *termenv.Output, version string) string {
@@ -61,15 +74,30 @@ func formatTitle(output *termenv.Output, version string) string {
 func NewTUI(client *jsonrpcclient.Client, version string) *tea.Program {
 	output := termenv.NewOutput(os.Stdout)
 	model := Model{
-		Client:         client,
-		Content:        []LogEntry{},
-		output:         output,
-		formattedTitle: formatTitle(output, version),
+		Client:  client,
+		Content: []LogEntry{},
+		output:  output,
+		version: version,
 	}
 
 	model.LoadOptions()
+
+	// Todo: do this async
+	model.LoadPrinterInfo()
+
 	program := tea.NewProgram(model)
 	return program
+}
+
+func (m *Model) LoadPrinterInfo() {
+	response := m.Client.Call("printer.info", map[string]interface{}{})
+	v, ok := response.Result.(map[string]interface{})
+	if ok {
+		m.host = v["hostname"].(string)
+	} else {
+		panic("")
+	}
+
 }
 
 func (m *Model) LoadHelp() {
@@ -84,24 +112,60 @@ func (m *Model) LoadHelp() {
 }
 
 func (m *Model) generateStyles() {
-	b := lipgloss.RoundedBorder()
-	b.BottomRight = "┤"
-	b.BottomLeft = "├"
-	m.viewportStyle = lipgloss.NewStyle().BorderStyle(b).BorderForeground(m.Options.BorderColor).Padding(0, 1)
-	m.inputStyle = lipgloss.NewStyle().BorderStyle(lipgloss.RoundedBorder()).Padding(0, 1).BorderLeft(true).BorderRight(true).BorderBottom(true).BorderForeground(m.Options.BorderColor)
+
+	vpBorder := m.Options.BorderType
+	vpBorder.BottomRight = vpBorder.MiddleRight
+	vpBorder.BottomLeft = vpBorder.MiddleLeft
+
+	m.viewportBorderStyle = lipgloss.NewStyle().
+		BorderStyle(vpBorder).
+		BorderLeft(true).
+		BorderRight(true).
+		BorderForeground(m.Options.BorderForeground).
+		BorderBackground(m.Options.BorderBackground).
+		Padding(0, 1)
+
+	inpBorder := m.Options.BorderType
+	inpBorder.TopRight = vpBorder.MiddleRight
+	inpBorder.TopLeft = vpBorder.MiddleLeft
+
+	m.inputBorderStyle = lipgloss.NewStyle().
+		BorderStyle(inpBorder).
+		Padding(0, 1).
+		BorderTop(true).
+		BorderLeft(true).
+		BorderRight(true).
+		BorderBottom(true).
+		BorderForeground(m.Options.BorderForeground).
+		BorderBackground(m.Options.BorderBackground)
+
+	m.inlineBorderStyle = lipgloss.NewStyle().
+		Foreground(m.viewportBorderStyle.GetBorderTopForeground()).
+		Background(m.viewportBorderStyle.GetBorderTopBackground())
+
+	m.inputTextStyle = lipgloss.NewStyle().
+		// These are broken in the bubbles.textinput
+		// They add an extra line under the input
+		//Foreground(m.Options.InputForeground).
+		//Background(m.Options.InputBackground).
+		Inline(true)
+
 }
 
 func (m *Model) LoadOptions() {
 	m.Options = &UIOptions{
-		LogIncoming:     false,
-		TimestampFormat: time.Kitchen,
-		BorderColor:     lipgloss.Color("#00FF00"),
+		LogIncoming:      false,
+		TimestampFormat:  "hh:mma",
+		BorderType:       lipgloss.NormalBorder(),
+		BorderForeground: lipgloss.Color("#00FF00"),
+		InputForeground:  lipgloss.Color("#FFFFFF"),
+		InputBackground:  lipgloss.Color("#0000FF"),
 	}
 	m.generateStyles()
 }
 
 func (m *Model) getLogTimestamp() string {
-	return m.output.String(time.Now().Format(m.Options.TimestampFormat)).Foreground(m.output.Color("#666666")).String()
+	return m.output.String(gostradamus.Now().Format(m.Options.TimestampFormat)).Foreground(m.output.Color("#666666")).String()
 }
 
 func (m *Model) readIncoming() tea.Cmd {
@@ -148,6 +212,9 @@ func (m *Model) renderContent() string {
 }
 
 func (m *Model) AppendLog(logEntry LogEntry) {
+	if logEntry.timestamp == "" {
+		logEntry.timestamp = m.getLogTimestamp()
+	}
 	first := len(m.Content) == 0
 	m.Content = append(m.Content, logEntry)
 	if !first {
@@ -162,39 +229,64 @@ func (m *Model) handleIncoming(req jsonrpcclient.IncomingJsonRPCRequest) {
 	switch req.Method {
 	case "notify_gcode_response":
 		for _, line := range req.Params {
-			m.AppendLog(LogEntry{timestamp: m.getLogTimestamp(), message: line.(string)})
+			m.AppendLog(LogEntry{message: line.(string)})
 		}
 	default:
 		if m.Options.LogIncoming {
 			encoded, _ := json.Marshal(req)
-			m.AppendLog(LogEntry{message: string(encoded), timestamp: m.getLogTimestamp()})
+			m.AppendLog(LogEntry{message: string(encoded)})
 		}
 	}
 }
 
 func (m *Model) cmdSet(rawArgs string) {
 	args := strings.Fields(rawArgs)
-	r := reflect.ValueOf(m.Options)
-	f := reflect.Indirect(r).FieldByName(args[0])
-
-	switch f.Kind() {
-	case reflect.Bool:
-		var b bool
-		err := json.Unmarshal([]byte(args[1]), &b)
-		if err != nil {
-			m.AppendLog(LogEntry{timestamp: m.getLogTimestamp(), message: "Invalid boolean value: " + args[1]})
-		} else {
-			f.SetBool(b)
+	var val interface{}
+	var err error
+	switch strings.ToLower(args[0]) {
+	case "borderforeground":
+		val, err = parseColor(args[1])
+		if err == nil {
+			m.Options.BorderForeground = val.(lipgloss.Color)
 		}
-	case reflect.Interface:
-		colorType := reflect.TypeOf((*lipgloss.TerminalColor)(nil)).Elem()
-		if f.Type().Implements(colorType) {
-			f.Set(reflect.ValueOf(lipgloss.Color(args[1])))
-			m.generateStyles()
+	case "borderbackground":
+		val, err = parseColor(args[1])
+		if err == nil {
+			m.Options.BorderBackground = val.(lipgloss.Color)
+		}
+	case "inputforeground":
+		val, err = parseColor(args[1])
+		if err == nil {
+			m.Options.InputForeground = val.(lipgloss.Color)
+		}
+	case "inputbackground":
+		val, err = parseColor(args[1])
+		if err == nil {
+			m.Options.InputBackground = val.(lipgloss.Color)
+		}
+	case "bordertype":
+		val, err = parseBorderType(args[1])
+		if err == nil {
+			m.Options.BorderType = val.(lipgloss.Border)
+		}
+	case "logincoming":
+		val, err = parseBool(args[1])
+		if err == nil {
+			m.Options.LogIncoming = val.(bool)
+		}
+	case "timestampformat":
+		val, err = parseTimestampFormat(args[1])
+		if err == nil {
+			m.Options.TimestampFormat = val.(string)
 		}
 	default:
-		m.AppendLog(LogEntry{timestamp: m.getLogTimestamp(), message: "Kind " + f.Kind().String()})
+		err = errors.New("Unknown Option: " + args[0])
 	}
+	if err != nil {
+		m.AppendLog(LogEntry{message: err.Error()})
+		return
+	}
+	m.generateStyles()
 }
 
 func (m *Model) cmdClear() {
@@ -256,6 +348,7 @@ func (m *Model) RegisterCompleters() {
 		cmdinput.NewStringCompleter("/rpc"),
 		cmdinput.NewListCompleter(MoonrakerRPCMethods...),
 	)
+
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -294,29 +387,43 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		verticalMarginHeight := 4
 		if !m.Ready {
-			m.Viewport = viewport.New(msg.Width-4, msg.Height-verticalMarginHeight)
+			m.Viewport = viewport.New(msg.Width-2, msg.Height-verticalMarginHeight)
 			m.Viewport.YPosition = 0
 			m.Viewport.SetContent(m.renderContent())
+
+			m.TitleBar = NewTitleBar(m.host, m.version)
+			m.TitleBar.BorderType = m.viewportBorderStyle.GetBorderStyle()
+			m.TitleBar.BorderStyle = m.inlineBorderStyle
+
 			m.Input = cmdinput.New()
+			m.Input.SetTextStyle(m.inputTextStyle)
+			m.Input.TextInput.Width = msg.Width - 4
+
 			m.RegisterCompleters()
 			m.LoadHelp()
-			m.Input.TextInput.Width = msg.Width - 4
 			m.Ready = true
 			cmds = append(cmds, m.readIncoming())
 
 		} else {
+			// just resize everything
 			m.Viewport.Width = msg.Width - 4
 			m.Viewport.Height = msg.Height - verticalMarginHeight
 			m.Input.TextInput.Width = msg.Width - 4
+			m.TitleBar.Width = msg.Width
 			m.Viewport.SetContent(m.renderContent())
 		}
 		m.Viewport, cmd = m.Viewport.Update(msg)
 		cmds = append(cmds, cmd)
-
+		m.Input, cmd = m.Input.Update(msg)
+		cmds = append(cmds, cmd)
+		m.TitleBar, cmd = m.TitleBar.Update(msg)
+		cmds = append(cmds, cmd)
 	default:
 		m.Viewport, cmd = m.Viewport.Update(msg)
 		cmds = append(cmds, cmd)
 		m.Input, cmd = m.Input.Update(msg)
+		cmds = append(cmds, cmd)
+		m.TitleBar, cmd = m.TitleBar.Update(msg)
 		cmds = append(cmds, cmd)
 	}
 
@@ -327,35 +434,9 @@ func (m Model) View() string {
 	if !m.Ready {
 		return "\n  Initializing..."
 	}
-
-	vp := m.viewportStyle.Width(m.Viewport.Width).Render(m.Viewport.View())
+	tb := m.TitleBar.View()
+	vp := m.viewportBorderStyle.Width(m.Viewport.Width).Render(m.Viewport.View())
 	// replace the top left corner with a title bar
-	borderStyle := lipgloss.NewStyle().Foreground(m.Options.BorderColor)
-	title := borderStyle.Render("╭─┤ ") + (m.formattedTitle) + borderStyle.Render(" ├")
-	titleW := ansi.PrintableRuneWidth(title)
-	_, rest := AnsiSplitAt(vp, titleW)
-	vp = title + borderStyle.Render(rest)
-	inp := m.inputStyle.Width(m.Viewport.Width).Render(m.Input.View())
-	return fmt.Sprintf("%s\n%s", vp, inp)
-}
-
-func AnsiSplitAt(input string, chars int) (string, string) {
-	var n int
-	var isAnsi bool
-
-	for i, c := range input {
-		if c == ansi.Marker {
-			isAnsi = true
-		} else if isAnsi {
-			if ansi.IsTerminator(c) {
-				isAnsi = false
-			}
-		} else {
-			n += runewidth.RuneWidth(c)
-			if n == chars+1 {
-				return input[:i], input[i:]
-			}
-		}
-	}
-	return input, ""
+	inp := m.inputBorderStyle.Width(m.Viewport.Width).Render(m.Input.View())
+	return fmt.Sprintf("%s\n%s\n%s", tb, vp, inp)
 }
