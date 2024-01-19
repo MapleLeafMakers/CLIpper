@@ -10,7 +10,7 @@ import (
 )
 
 type Client struct {
-	url              string
+	Url              string
 	connection       *websocket.Conn
 	mutex            sync.Mutex
 	isConnected      bool
@@ -49,7 +49,7 @@ type JsonRPCResponse struct {
 
 func NewClient(url string) *Client {
 	return &Client{
-		url:              url,
+		Url:              url,
 		Incoming:         make(chan IncomingJsonRPCRequest),
 		outgoing:         make(chan JsonRPCRequest),
 		responseHandlers: make(map[string]chan JsonRPCResponse),
@@ -65,7 +65,7 @@ func (c *Client) Connect() error {
 		return nil
 	}
 
-	u, _ := url.Parse(c.url)
+	u, _ := url.Parse(c.Url)
 	c.connection, _, err = websocket.DefaultDialer.Dial(u.String(), nil)
 	if err != nil {
 		return err

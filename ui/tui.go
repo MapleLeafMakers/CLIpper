@@ -63,6 +63,8 @@ type Model struct {
 	gcodeHelp map[string]string
 }
 
+type initializedMsg struct{}
+
 func formatTitle(output *termenv.Output, version string) string {
 	if matched, err := regexp.MatchString("^v\\d+\\.\\d+\\.\\d+-[0-9a-f]{7}$", version); err == nil && matched {
 		version = strings.Split(version, "-")[0]
@@ -150,6 +152,9 @@ func (m *Model) generateStyles() {
 		//Background(m.Options.InputBackground).
 		Inline(true)
 
+	m.TitleBar.BorderType = m.Options.BorderType
+	m.TitleBar.BorderStyle = m.inlineBorderStyle
+
 }
 
 func (m *Model) LoadOptions() {
@@ -157,7 +162,7 @@ func (m *Model) LoadOptions() {
 		LogIncoming:      false,
 		TimestampFormat:  "hh:mma",
 		BorderType:       lipgloss.NormalBorder(),
-		BorderForeground: lipgloss.Color("#00FF00"),
+		BorderForeground: lipgloss.Color("#004444"),
 		InputForeground:  lipgloss.Color("#FFFFFF"),
 		InputBackground:  lipgloss.Color("#0000FF"),
 	}
@@ -176,7 +181,10 @@ func (m *Model) readIncoming() tea.Cmd {
 }
 
 func (m Model) Init() tea.Cmd {
-	return nil
+	return func() tea.Msg {
+		//m.Client.Call()
+		return initializedMsg{}
+	}
 }
 
 func (m *Model) renderEntry(logEntry LogEntry) string {
@@ -358,6 +366,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	)
 
 	switch msg := msg.(type) {
+
+	case initializedMsg:
+		m.AppendLog(LogEntry{message: "Connected to " + m.Client.Url})
 	case tea.KeyMsg:
 		key := msg.String()
 		if key == "ctrl+c" {
@@ -380,6 +391,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.Input, cmd = m.Input.Update(msg)
 			cmds = append(cmds, cmd)
 		}
+
 	case jsonrpcclient.IncomingJsonRPCRequest:
 		m.handleIncoming(msg)
 		cmds = append(cmds, m.readIncoming())
@@ -396,9 +408,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.TitleBar.BorderStyle = m.inlineBorderStyle
 
 			m.Input = cmdinput.New()
-			m.Input.SetTextStyle(m.inputTextStyle)
 			m.Input.TextInput.Width = msg.Width - 4
-
+			m.generateStyles()
 			m.RegisterCompleters()
 			m.LoadHelp()
 			m.Ready = true

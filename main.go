@@ -44,6 +44,18 @@ func main() {
 			url = "ws://" + args[0] + "/websocket"
 		}
 	default:
+		fmt.Println("clipper " + version + "-" + commit)
+		fmt.Println("\nUsage: " +
+			"\n\t" + os.Args[0] + " <hostname/ip> [<port>]" +
+			"\n\t" + os.Args[0] + " <hostname/ip>:<port>" +
+			"\n\t" + os.Args[0] + " ws[s]://<hostname/ip>[:<port>]/path")
+		fmt.Println("\nExamples: " +
+			"\n\t" + os.Args[0] + " mainsailos.local" +
+			"\n\t" + os.Args[0] + " ws://mainsailos.local/websocket" +
+			"\n\t" + os.Args[0] + " myvzero.local 6969" +
+			"\n\t" + os.Args[0] + " 192.168.1.69:8000\n")
+		os.Exit(1)
+
 		url = "ws://localhost/websocket"
 	}
 
