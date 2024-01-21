@@ -4,450 +4,264 @@ import (
 	"clipper/jsonrpcclient"
 	"clipper/ui/cmdinput"
 	"encoding/json"
-	"errors"
-	"fmt"
 	"github.com/bykof/gostradamus"
-	"github.com/charmbracelet/bubbles/viewport"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
-	"github.com/muesli/reflow/ansi"
-	"github.com/muesli/reflow/wrap"
-	"github.com/muesli/termenv"
-	"os"
-	"reflect"
-	"regexp"
-	"strings"
+	"github.com/gdamore/tcell/v2"
+	"github.com/rivo/tview"
+	"log"
 )
 
-var ()
+const wordList = "ability,able,about,above,accept,according,account,across,act,action,activity,actually,add,address,administration,admit,adult,affect,after,again,against,age,agency,agent,ago,agree,agreement,ahead,air,all,allow,almost,alone,along,already,also,although,always,American,among,amount,analysis,and,animal,another,answer,any,anyone,anything,appear,apply,approach,area,argue,arm,around,arrive,art,article,artist,as,ask,assume,at,attack,attention,attorney,audience,author,authority,available,avoid,away,baby,back,bad,bag,ball,bank,bar,base,be,beat,beautiful,because,become,bed,before,begin,behavior,behind,believe,benefit,best,better,between,beyond,big,bill,billion,bit,black,blood,blue,board,body,book,born,both,box,boy,break,bring,brother,budget,build,building,business,but,buy,by,call,camera,campaign,can,cancer,candidate,capital,car,card,care,career,carry,case,catch,cause,cell,center,central,century,certain,certainly,chair,challenge,chance,change,character,charge,check,child,choice,choose,church,citizen,city,civil,claim,class,clear,clearly,close,coach,cold,collection,college,color,come,commercial,common,community,company,compare,computer,concern,condition,conference,Congress,consider,consumer,contain,continue,control,cost,could,country,couple,course,court,cover,create,crime,cultural,culture,cup,current,customer,cut,dark,data,daughter,day,dead,deal,death,debate,decade,decide,decision,deep,defense,degree,Democrat,democratic,describe,design,despite,detail,determine,develop,development,die,difference,different,difficult,dinner,direction,director,discover,discuss,discussion,disease,do,doctor,dog,door,down,draw,dream,drive,drop,drug,during,each,early,east,easy,eat,economic,economy,edge,education,effect,effort,eight,either,election,else,employee,end,energy,enjoy,enough,enter,entire,environment,environmental,especially,establish,even,evening,event,ever,every,everybody,everyone,everything,evidence,exactly,example,executive,exist,expect,experience,expert,explain,eye,face,fact,factor,fail,fall,family,far,fast,father,fear,federal,feel,feeling,few,field,fight,figure,fill,film,final,finally,financial,find,fine,finger,finish,fire,firm,first,fish,five,floor,fly,focus,follow,food,foot,for,force,foreign,forget,form,former,forward,four,free,friend,from,front,full,fund,future,game,garden,gas,general,generation,get,girl,give,glass,go,goal,good,government,great,green,ground,group,grow,growth,guess,gun,guy,hair,half,hand,hang,happen,happy,hard,have,he,head,health,hear,heart,heat,heavy,help,her,here,herself,high,him,himself,his,history,hit,hold,home,hope,hospital,hot,hotel,hour,house,how,however,huge,human,hundred,husband,idea,identify,if,image,imagine,impact,important,improve,in,include,including,increase,indeed,indicate,individual,industry,information,inside,instead,institution,interest,interesting,international,interview,into,investment,involve,issue,it,item,its,itself,job,join,just,keep,key,kid,kill,kind,kitchen,know,knowledge,land,language,large,last,late,later,laugh,law,lawyer,lay,lead,leader,learn,least,leave,left,leg,legal,less,let,letter,level,lie,life,light,like,likely,line,list,listen,little,live,local,long,look,lose,loss,lot,love,low,machine,magazine,main,maintain,major,majority,make,man,manage,management,manager,many,market,marriage,material,matter,may,maybe,me,mean,measure,media,medical,meet,meeting,member,memory,mention,message,method,middle,might,military,million,mind,minute,miss,mission,model,modern,moment,money,month,more,morning,most,mother,mouth,move,movement,movie,Mr,Mrs,much,music,must,my,myself,n't,name,nation,national,natural,nature,near,nearly,necessary,need,network,never,new,news,newspaper,next,nice,night,no,none,nor,north,not,note,nothing,notice,now,number,occur,of,off,offer,office,officer,official,often,oh,oil,ok,old,on,once,one,only,onto,open,operation,opportunity,option,or,order,organization,other,others,our,out,outside,over,own,owner,page,pain,painting,paper,parent,part,participant,particular,particularly,partner,party,pass,past,patient,pattern,pay,peace,people,per,perform,performance,perhaps,period,person,personal,phone,physical,pick,picture,piece,place,plan,plant,play,player,PM,point,police,policy,political,politics,poor,popular,population,position,positive,possible,power,practice,prepare,present,president,pressure,pretty,prevent,price,private,probably,problem,process,produce,product,production,professional,professor,program,project,property,protect,prove,provide,public,pull,purpose,push,put,quality,question,quickly,quite,race,radio,raise,range,rate,rather,reach,read,ready,real,reality,realize,really,reason,receive,recent,recently,recognize,record,red,reduce,reflect,region,relate,relationship,religious,remain,remember,remove,report,represent,Republican,require,research,resource,respond,response,responsibility,rest,result,return,reveal,rich,right,rise,risk,road,rock,role,room,rule,run,safe,same,save,say,scene,school,science,scientist,score,sea,season,seat,second,section,security,see,seek,seem,sell,send,senior,sense,series,serious,serve,service,set,seven,several,sex,sexual,shake,share,she,shoot,short,shot,should,shoulder,show,side,sign,significant,similar,simple,simply,since,sing,single,sister,sit,site,situation,six,size,skill,skin,small,smile,so,social,society,soldier,some,somebody,someone,something,sometimes,son,song,soon,sort,sound,source,south,southern,space,speak,special,specific,speech,spend,sport,spring,staff,stage,stand,standard,star,start,state,statement,station,stay,step,still,stock,stop,store,story,strategy,street,strong,structure,student,study,stuff,style,subject,success,successful,such,suddenly,suffer,suggest,summer,support,sure,surface,system,table,take,talk,task,tax,teach,teacher,team,technology,television,tell,ten,tend,term,test,than,thank,that,the,their,them,themselves,then,theory,there,these,they,thing,think,third,this,those,though,thought,thousand,threat,three,through,throughout,throw,thus,time,to,today,together,tonight,too,top,total,tough,toward,town,trade,traditional,training,travel,treat,treatment,tree,trial,trip,trouble,true,truth,try,turn,TV,two,type,under,understand,unit,until,up,upon,us,use,usually,value,various,very,victim,view,violence,visit,voice,vote,wait,walk,wall,want,war,watch,water,way,we,weapon,wear,week,weight,well,west,western,what,whatever,when,where,whether,which,while,white,who,whole,whom,whose,why,wide,wife,will,win,wind,window,wish,with,within,without,woman,wonder,word,work,worker,world,worry,would,write,writer,wrong,yard,yeah,year,yes,yet,you,young,your,yourself"
 
 type LogEntry struct {
-	timestamp string
-	message   string
+	Timestamp gostradamus.DateTime
+	Message   string
 }
 
-type UIOptions struct {
-	LogIncoming     bool
-	TimestampFormat string
-
-	BorderType       lipgloss.Border
-	BorderForeground lipgloss.TerminalColor
-	BorderBackground lipgloss.TerminalColor
-
-	InputForeground lipgloss.TerminalColor
-	InputBackground lipgloss.TerminalColor
+type LogContent struct {
+	tview.TableContentReadOnly
+	entries []LogEntry
+	table   *tview.Table
 }
 
-type Model struct {
-	Content []LogEntry
-
-	Ready    bool
-	Viewport viewport.Model
-	Input    cmdinput.Model
-	TitleBar TitleBar
-
-	Client  *jsonrpcclient.Client
-	output  *termenv.Output
-	Options *UIOptions
-
-	host            string
-	version         string
-	renderedContent string
-
-	inputBorderStyle    lipgloss.Style
-	viewportBorderStyle lipgloss.Style
-	inlineBorderStyle   lipgloss.Style
-	titleStyle          lipgloss.Style
-	inputTextStyle      lipgloss.Style // broken
-
-	gcodeHelp map[string]string
-}
-
-type initializedMsg struct{}
-
-func formatTitle(output *termenv.Output, version string) string {
-	if matched, err := regexp.MatchString("^v\\d+\\.\\d+\\.\\d+-[0-9a-f]{7}$", version); err == nil && matched {
-		version = strings.Split(version, "-")[0]
+func (l *LogContent) Write(message string) {
+	lines := cmdinput.WordWrap(cmdinput.Escape(message), 999) //arbitrary number to force it to only split on actual linebreaks for now
+	for _, line := range lines {
+		l.entries = append(l.entries, LogEntry{gostradamus.Now(), line})
 	}
-	return output.String("🚣 CLIpper " + version).Foreground(output.Color("#FFFF00")).String()
-
+	l.table.ScrollToEnd()
 }
 
-func NewTUI(client *jsonrpcclient.Client, version string) *tea.Program {
-	output := termenv.NewOutput(os.Stdout)
-	model := Model{
-		Client:  client,
-		Content: []LogEntry{},
-		output:  output,
-		version: version,
+func (l LogContent) GetCell(row, column int) *tview.TableCell {
+
+	switch column {
+	case 0:
+		return tview.NewTableCell(l.entries[row].Timestamp.Format(" hh:mma")).SetBackgroundColor(tcell.NewRGBColor(64, 64, 64))
+	case 1:
+		return tview.NewTableCell(" " + l.entries[row].Message)
+	}
+	return nil
+}
+
+func (l LogContent) GetRowCount() int {
+	return len(l.entries)
+}
+
+func (l LogContent) GetColumnCount() int {
+	return 2
+}
+
+type TUI struct {
+	App          *tview.Application
+	Root         *tview.Grid
+	Input        *cmdinput.InputField
+	Output       *LogContent
+	RpcClient    *jsonrpcclient.Client
+	TabCompleter cmdinput.TabCompleter
+	State        map[string]interface{}
+	Settings     Settings
+	HostHeader   *tview.TextView
+}
+
+func NewTUI(rpcClient *jsonrpcclient.Client) *TUI {
+	tui := &TUI{
+		RpcClient: rpcClient,
 	}
 
-	model.LoadOptions()
-
-	// Todo: do this async
-	model.LoadPrinterInfo()
-
-	program := tea.NewProgram(model)
-	return program
+	tview.Styles.PrimitiveBackgroundColor = tcell.ColorDefault
+	tui.Settings = AppSettings
+	tui.buildInput()
+	tui.buildOutput(100)
+	tui.buildWindow()
+	tui.buildLeftPanel()
+	tui.App = tview.NewApplication().SetRoot(tui.Root, true).EnableMouse(true)
+	go tui.loadPrinterInfo()
+	go tui.loadGcodeHelp()
+	go tui.subscribe()
+	go tui.handleIncoming()
+	return tui
 }
 
-func (m *Model) LoadPrinterInfo() {
-	response := m.Client.Call("printer.info", map[string]interface{}{})
-	v, ok := response.Result.(map[string]interface{})
-	if ok {
-		m.host = v["hostname"].(string)
-	} else {
-		panic("")
-	}
+func (tui *TUI) buildInput() {
+	tui.Input = cmdinput.NewInputField().SetPlaceholder("Enter GCODE Commands or / commands").SetLabel("> ").SetLabelStyle(tcell.StyleDefault.Background(tcell.ColorBlue).Foreground(tcell.ColorWhite).Bold(true))
 
-}
+	tui.TabCompleter = cmdinput.NewTabCompleter()
+	tui.TabCompleter.RegisterCommand("/set", Command_Set{})
+	tui.TabCompleter.RegisterCommand("/settings", Command_Settings{})
+	tui.TabCompleter.RegisterCommand("/quit", Command_Quit{})
+	tui.TabCompleter.RegisterCommand("/rpc", Command_RPC{})
 
-func (m *Model) LoadHelp() {
-	response := m.Client.Call("printer.gcode.help", map[string]interface{}{})
-	v, ok := response.Result.(map[string]interface{})
-	if !ok {
-		panic(fmt.Sprintf("OHNOES %+v", response.Result))
-	}
-	for cmd, _ := range v {
-		m.Input.TabComplete.RegisterCompletion(cmdinput.NewStringCompleter(cmd))
-	}
-}
+	tui.Input.SetAutocompleteFunc(func(currentText string) (entries []string) {
+		ctx := cmdinput.CommandContext{
+			"tui": tui,
+			"raw": currentText,
+		}
+		return tui.TabCompleter.AutoComplete(currentText, tui.Input.GetCursor(), ctx)
+	})
 
-func (m *Model) generateStyles() {
+	tui.Input.SetAutocompletedFunc(func(text string, index, source int) bool {
+		closeMenu, fullText, cursorPos := tui.TabCompleter.OnAutoCompleted(text, index, source)
+		tui.Input.SetText(fullText)
+		tui.Input.SetCursor(cursorPos)
+		return closeMenu
+	})
 
-	vpBorder := m.Options.BorderType
-	vpBorder.BottomRight = vpBorder.MiddleRight
-	vpBorder.BottomLeft = vpBorder.MiddleLeft
-
-	m.viewportBorderStyle = lipgloss.NewStyle().
-		BorderStyle(vpBorder).
-		BorderLeft(true).
-		BorderRight(true).
-		BorderForeground(m.Options.BorderForeground).
-		BorderBackground(m.Options.BorderBackground).
-		Padding(0, 1)
-
-	inpBorder := m.Options.BorderType
-	inpBorder.TopRight = vpBorder.MiddleRight
-	inpBorder.TopLeft = vpBorder.MiddleLeft
-
-	m.inputBorderStyle = lipgloss.NewStyle().
-		BorderStyle(inpBorder).
-		Padding(0, 1).
-		BorderTop(true).
-		BorderLeft(true).
-		BorderRight(true).
-		BorderBottom(true).
-		BorderForeground(m.Options.BorderForeground).
-		BorderBackground(m.Options.BorderBackground)
-
-	m.inlineBorderStyle = lipgloss.NewStyle().
-		Foreground(m.viewportBorderStyle.GetBorderTopForeground()).
-		Background(m.viewportBorderStyle.GetBorderTopBackground())
-
-	m.inputTextStyle = lipgloss.NewStyle().
-		// These are broken in the bubbles.textinput
-		// They add an extra line under the input
-		//Foreground(m.Options.InputForeground).
-		//Background(m.Options.InputBackground).
-		Inline(true)
-
-	m.TitleBar.BorderType = m.Options.BorderType
-	m.TitleBar.BorderStyle = m.inlineBorderStyle
-
-}
-
-func (m *Model) LoadOptions() {
-	m.Options = &UIOptions{
-		LogIncoming:      false,
-		TimestampFormat:  "hh:mma",
-		BorderType:       lipgloss.NormalBorder(),
-		BorderForeground: lipgloss.Color("#004444"),
-		InputForeground:  lipgloss.Color("#FFFFFF"),
-		InputBackground:  lipgloss.Color("#0000FF"),
-	}
-	m.generateStyles()
-}
-
-func (m *Model) getLogTimestamp() string {
-	return m.output.String(gostradamus.Now().Format(m.Options.TimestampFormat)).Foreground(m.output.Color("#666666")).String()
-}
-
-func (m *Model) readIncoming() tea.Cmd {
-	return func() tea.Msg {
-		msg := <-m.Client.Incoming
-		return msg
-	}
-}
-
-func (m Model) Init() tea.Cmd {
-	return func() tea.Msg {
-		//m.Client.Call()
-		return initializedMsg{}
-	}
-}
-
-func (m *Model) renderEntry(logEntry LogEntry) string {
-	timestampWidth := ansi.PrintableRuneWidth(logEntry.timestamp)
-	pad := strings.Repeat(" ", timestampWidth)
-	w := m.Viewport.Width - (timestampWidth + 5)
-	wrapped := wrap.String(logEntry.message, w)
-	out := ""
-	div := m.output.String(" │ ").Foreground(m.output.Color("#666666")).String()
-	for i, line := range strings.Split(wrapped, "\n") {
-		if i == 0 {
-			out += logEntry.timestamp + div + line + "\n"
+	tui.Input.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		if event.Key() == tcell.KeyPgUp || event.Key() == tcell.KeyPgDn {
+			tui.Output.table.InputHandler()(event, func(p tview.Primitive) {})
 		} else {
-			out += pad + div + line + "\n"
+			return event
 		}
-	}
+		return nil
+	})
 
-	return out
-}
-
-func (m *Model) renderContent() string {
-	rendered := ""
-	//l := len(m.Content)
-	for i, logEntry := range m.Content {
-		if i > 0 {
-			rendered = rendered + "\n"
-		}
-		rendered = rendered + m.renderEntry(logEntry)
-
-	}
-	m.renderedContent = strings.Trim(rendered, "\n")
-	return m.renderedContent
-}
-
-func (m *Model) AppendLog(logEntry LogEntry) {
-	if logEntry.timestamp == "" {
-		logEntry.timestamp = m.getLogTimestamp()
-	}
-	first := len(m.Content) == 0
-	m.Content = append(m.Content, logEntry)
-	if !first {
-		m.renderedContent = m.renderedContent + "\n"
-	}
-	m.renderedContent = m.renderedContent + strings.Trim(m.renderEntry(logEntry), "\n")
-	m.Viewport.SetContent(m.renderedContent)
-	m.Viewport.GotoBottom()
-}
-
-func (m *Model) handleIncoming(req jsonrpcclient.IncomingJsonRPCRequest) {
-	switch req.Method {
-	case "notify_gcode_response":
-		for _, line := range req.Params {
-			m.AppendLog(LogEntry{message: line.(string)})
-		}
-	default:
-		if m.Options.LogIncoming {
-			encoded, _ := json.Marshal(req)
-			m.AppendLog(LogEntry{message: string(encoded)})
-		}
-	}
-}
-
-func (m *Model) cmdSet(rawArgs string) {
-	args := strings.Fields(rawArgs)
-	var val interface{}
-	var err error
-	switch strings.ToLower(args[0]) {
-	case "borderforeground":
-		val, err = parseColor(args[1])
-		if err == nil {
-			m.Options.BorderForeground = val.(lipgloss.Color)
-		}
-	case "borderbackground":
-		val, err = parseColor(args[1])
-		if err == nil {
-			m.Options.BorderBackground = val.(lipgloss.Color)
-		}
-	case "inputforeground":
-		val, err = parseColor(args[1])
-		if err == nil {
-			m.Options.InputForeground = val.(lipgloss.Color)
-		}
-	case "inputbackground":
-		val, err = parseColor(args[1])
-		if err == nil {
-			m.Options.InputBackground = val.(lipgloss.Color)
-		}
-	case "bordertype":
-		val, err = parseBorderType(args[1])
-		if err == nil {
-			m.Options.BorderType = val.(lipgloss.Border)
-		}
-	case "logincoming":
-		val, err = parseBool(args[1])
-		if err == nil {
-			m.Options.LogIncoming = val.(bool)
-		}
-	case "timestampformat":
-		val, err = parseTimestampFormat(args[1])
-		if err == nil {
-			m.Options.TimestampFormat = val.(string)
-		}
-	default:
-		err = errors.New("Unknown Option: " + args[0])
-	}
-	if err != nil {
-		m.AppendLog(LogEntry{message: err.Error()})
-		return
-	}
-	m.generateStyles()
-}
-
-func (m *Model) cmdClear() {
-	m.Content = []LogEntry{}
-	m.renderedContent = ""
-	m.Viewport.SetContent("")
-}
-
-func (m *Model) cmdRpc(rawArgs string) {
-	parts := strings.SplitN(rawArgs, " ", 2)
-	var params map[string]interface{}
-	if len(parts) == 2 {
-		json.Unmarshal([]byte(parts[1]), &params)
-	} else {
-		params = map[string]interface{}{}
-	}
-	result := m.Client.Call(parts[0], params)
-	res, _ := json.MarshalIndent(result.Result, " ", " ")
-	if result.Result != nil {
-		m.AppendLog(LogEntry{timestamp: m.getLogTimestamp(), message: string(res)})
-	}
-
-}
-func (m *Model) processCommand(input string) {
-	split := strings.SplitN(input, " ", 2)
-	cmd := strings.ToLower(split[0])
-	rawArgs := ""
-	if len(split) == 2 {
-		rawArgs = split[1]
-	}
-	switch cmd {
-	case "set":
-		m.cmdSet(rawArgs)
-	case "clear":
-		m.cmdClear()
-	case "rpc":
-		m.cmdRpc(rawArgs)
-	}
-
-}
-
-func (m *Model) RegisterCompleters() {
-	// /clear
-	m.Input.TabComplete.RegisterCompletion(cmdinput.NewStringCompleter("/clear"))
-
-	// /set
-	r := reflect.TypeOf(*m.Options)
-	optionKeys := make([]string, r.NumField())
-	for i := 0; i < len(optionKeys); i++ {
-		optionKeys[i] = r.Field(i).Name
-	}
-	m.Input.TabComplete.RegisterCompletion(
-		cmdinput.NewStringCompleter("/set"),
-		cmdinput.NewListCompleter(optionKeys...),
-	)
-
-	// /rpc
-	m.Input.TabComplete.RegisterCompletion(
-		cmdinput.NewStringCompleter("/rpc"),
-		cmdinput.NewListCompleter(MoonrakerRPCMethods...),
-	)
-
-}
-
-func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	var (
-		cmd  tea.Cmd
-		cmds []tea.Cmd
-	)
-
-	switch msg := msg.(type) {
-
-	case initializedMsg:
-		m.AppendLog(LogEntry{message: "Connected to " + m.Client.Url})
-	case tea.KeyMsg:
-		key := msg.String()
-		if key == "ctrl+c" {
-			return m, tea.Quit
-		} else if key == "pgup" || key == "pgdown" {
-			m.Viewport, cmd = m.Viewport.Update(msg)
-			cmds = append(cmds, cmd)
-		} else if key == "enter" {
-			val := m.Input.Value()
-			if val != "" {
-				if strings.HasPrefix(val, "/") {
-					m.processCommand(val[1:])
-				} else {
-					m.AppendLog(LogEntry{message: m.Input.Value(), timestamp: m.getLogTimestamp()})
-					go m.Client.Call("printer.gcode.script", map[string]interface{}{"script": val})
-				}
-				m.Input.NewEntry()
+	tui.Input.SetDoneFunc(func(key tcell.Key) {
+		switch key {
+		case tcell.KeyEnter:
+			ctx := cmdinput.CommandContext{
+				"tui": tui,
+				"raw": tui.Input.GetText(),
 			}
-		} else {
-			m.Input, cmd = m.Input.Update(msg)
-			cmds = append(cmds, cmd)
+			err := tui.TabCompleter.Parse(tui.Input.GetText(), ctx)
+			if err == nil {
+				log.Println("Executing", ctx)
+				cmd, ok := ctx["cmd"]
+				// ew
+				if ok {
+					cmd2, ok2 := cmd.(cmdinput.Command)
+					if ok2 {
+						go cmd2.Call(ctx)
+					}
+				} else {
+					//not a registered command, send it as gcode.
+					go (func() { NewGcodeCommand("", "").Call(ctx) })()
+				}
+				tui.Input.Clear()
+			} else if err.Error() == "NoInput" {
+
+			} else {
+				panic(err)
+			}
+		default:
 		}
-
-	case jsonrpcclient.IncomingJsonRPCRequest:
-		m.handleIncoming(msg)
-		cmds = append(cmds, m.readIncoming())
-
-	case tea.WindowSizeMsg:
-		verticalMarginHeight := 4
-		if !m.Ready {
-			m.Viewport = viewport.New(msg.Width-2, msg.Height-verticalMarginHeight)
-			m.Viewport.YPosition = 0
-			m.Viewport.SetContent(m.renderContent())
-
-			m.TitleBar = NewTitleBar(m.host, m.version)
-			m.TitleBar.BorderType = m.viewportBorderStyle.GetBorderStyle()
-			m.TitleBar.BorderStyle = m.inlineBorderStyle
-
-			m.Input = cmdinput.New()
-			m.Input.TextInput.Width = msg.Width - 4
-			m.generateStyles()
-			m.RegisterCompleters()
-			m.LoadHelp()
-			m.Ready = true
-			cmds = append(cmds, m.readIncoming())
-
-		} else {
-			// just resize everything
-			m.Viewport.Width = msg.Width - 4
-			m.Viewport.Height = msg.Height - verticalMarginHeight
-			m.Input.TextInput.Width = msg.Width - 4
-			m.TitleBar.Width = msg.Width
-			m.Viewport.SetContent(m.renderContent())
-		}
-		m.Viewport, cmd = m.Viewport.Update(msg)
-		cmds = append(cmds, cmd)
-		m.Input, cmd = m.Input.Update(msg)
-		cmds = append(cmds, cmd)
-		m.TitleBar, cmd = m.TitleBar.Update(msg)
-		cmds = append(cmds, cmd)
-	default:
-		m.Viewport, cmd = m.Viewport.Update(msg)
-		cmds = append(cmds, cmd)
-		m.Input, cmd = m.Input.Update(msg)
-		cmds = append(cmds, cmd)
-		m.TitleBar, cmd = m.TitleBar.Update(msg)
-		cmds = append(cmds, cmd)
-	}
-
-	return m, tea.Batch(cmds...)
+	})
 }
 
-func (m Model) View() string {
-	if !m.Ready {
-		return "\n  Initializing..."
+func (tui *TUI) buildLeftPanel() {
+	flex := tview.NewFlex().SetDirection(tview.FlexRow)
+	tui.HostHeader = tview.NewTextView().SetTextAlign(tview.AlignCenter).SetTextColor(tcell.ColorYellow)
+	tui.HostHeader.SetBackgroundColor(tcell.ColorDarkCyan)
+	tui.Root.AddItem(flex, 0, 0, 1, 1, 0, 0, false)
+	flex.AddItem(tui.HostHeader, 1, 1, false)
+	flex.AddItem(tview.NewBox().SetBorder(true), 0, 2, false)
+}
+
+func (tui *TUI) buildOutput(numLines int) {
+
+	output := tview.NewTable()
+	ts := gostradamus.Now()
+	lines := make([]LogEntry, numLines)
+	i := 0
+	for i = 0; i < numLines-6; i++ {
+		lines[i] = LogEntry{ts, ""}
 	}
-	tb := m.TitleBar.View()
-	vp := m.viewportBorderStyle.Width(m.Viewport.Width).Render(m.Viewport.View())
-	// replace the top left corner with a title bar
-	inp := m.inputBorderStyle.Width(m.Viewport.Width).Render(m.Input.View())
-	return fmt.Sprintf("%s\n%s\n%s", tb, vp, inp)
+	lines[i+0] = LogEntry{ts, "[yellow]   ________    ____                     "}
+	lines[i+1] = LogEntry{ts, "[yellow]  / ____/ /   /  _/___  ____  ___  _____"}
+	lines[i+2] = LogEntry{ts, "[yellow] / /   / /    / // __ \\/ __ \\/ _ \\/ ___/"}
+	lines[i+3] = LogEntry{ts, "[yellow]/ /___/ /____/ // /_/ / /_/ /  __/ /    "}
+	lines[i+4] = LogEntry{ts, "[yellow]\\____/_____/___/ .___/ .___/\\___/_/     "}
+	lines[i+5] = LogEntry{ts, "[yellow]              /_/   /_/                 "}
+
+	tui.Output = &LogContent{
+		table:   output,
+		entries: lines,
+	}
+	output.SetContent(tui.Output)
+	output.ScrollToEnd()
+}
+
+func (tui *TUI) buildWindow() {
+	tui.Root = tview.NewGrid().
+		SetRows(0, 1).
+		SetColumns(30, 0).
+		SetBorders(true).
+		AddItem(tui.Input, 1, 0, 1, 2, 0, 0, true).
+		AddItem(tui.Output.table, 0, 1, 1, 1, 0, 0, false)
+}
+
+func (tui *TUI) subscribe() {
+	resp, err := tui.RpcClient.Call("printer.objects.subscribe", map[string]interface{}{
+		"objects": map[string]interface{}{
+			"print_stats":  nil,
+			"idle_timeout": nil,
+			"gcode_move":   nil,
+		},
+	})
+	if err != nil {
+		panic(err)
+	}
+	state, _ := resp.(map[string]interface{})
+	tui.App.QueueUpdateDraw(func() {
+		tui.State = state
+	})
+}
+
+func (tui *TUI) handleIncoming() {
+	for {
+		logIncoming, _ := AppSettings["logIncoming"].(bool)
+		incoming := <-tui.RpcClient.Incoming
+		switch incoming.Method {
+		case "notify_status_update":
+			status := incoming.Params[0].(map[string]interface{})
+			if logIncoming {
+				out, _ := json.MarshalIndent(status, "", " ")
+				tui.App.QueueUpdateDraw(func() {
+					tui.Output.Write(string(out))
+				})
+			}
+		case "notify_gcode_response":
+			tui.App.QueueUpdateDraw(func() {
+				for _, line := range incoming.Params {
+					tui.Output.Write(line.(string))
+				}
+			})
+		default:
+			if logIncoming && incoming.Method != "notify_proc_stat_update" {
+				out, _ := json.MarshalIndent(incoming, "", " ")
+				tui.App.QueueUpdateDraw(func() {
+					tui.Output.Write(string(out))
+				})
+			}
+		}
+	}
+}
+
+func (tui *TUI) loadPrinterInfo() {
+	resp, err := tui.RpcClient.Call("printer.info", map[string]interface{}{})
+	if err != nil {
+		panic(err)
+	}
+	info, _ := resp.(map[string]interface{})
+	tui.App.QueueUpdateDraw(func() {
+		tui.HostHeader.SetText(info["hostname"].(string))
+	})
+}
+
+func (tui *TUI) loadGcodeHelp() {
+	resp, err := tui.RpcClient.Call("printer.gcode.help", map[string]interface{}{})
+	if err != nil {
+		panic(err)
+	}
+	tui.App.QueueUpdate(func() {
+		for k, help := range resp.(map[string]interface{}) {
+			tui.TabCompleter.RegisterCommand(k, NewGcodeCommand(k, help.(string)))
+		}
+	})
+}
+
+func dumpToJson(obj any) string {
+	out, err := json.MarshalIndent(obj, "", " ")
+	if err != nil {
+		return "<error>"
+	}
+	return string(out)
 }

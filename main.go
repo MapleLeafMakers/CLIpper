@@ -12,6 +12,17 @@ import (
 var version = "?"
 var commit = ""
 
+func configureLogger() {
+	if os.Getenv("DEBUG") == "1" {
+		logFile, err := os.OpenFile("./debug.log", os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0644)
+		if err != nil {
+			panic(err)
+		}
+		log.SetOutput(logFile)
+	}
+
+}
+
 func StartInteractive(url string) {
 	versionString := version
 	if commit != "" {
@@ -24,14 +35,17 @@ func StartInteractive(url string) {
 		log.Fatalf("Failed to connect: %v", err)
 	}
 
-	tui := ui.NewTUI(rpcClient, versionString)
-	if _, err := tui.Run(); err != nil {
+	tui := ui.NewTUI(rpcClient)
+	if err := tui.App.Run(); err != nil {
 		fmt.Println("could not run program:", err)
 		os.Exit(1)
 	}
 }
 
 func main() {
+
+	configureLogger()
+
 	args := os.Args[1:]
 	var url string
 	switch len(args) {

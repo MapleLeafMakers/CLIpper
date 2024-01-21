@@ -2,6 +2,7 @@ package jsonrpcclient
 
 import (
 	"encoding/json"
+	"errors"
 	"github.com/gorilla/websocket"
 	"log"
 	"net/url"
@@ -111,8 +112,11 @@ func (c *Client) readMessages() {
 
 			req := IncomingJsonRPCRequest{
 				Method:  method,
-				Params:  payload["params"].([]interface{}),
 				JsonRPC: "2.0",
+			}
+			if payload["params"] != nil {
+				log.Println("other Params", payload["params"])
+				req.Params, _ = payload["params"].([]interface{})
 			}
 			c.Incoming <- req
 		}
@@ -130,11 +134,13 @@ func (c *Client) writeMessages() {
 			log.Println("write error:", err)
 			c.isConnected = false
 			return
+		} else {
+			log.Println("Sent: ", string(encoded))
 		}
 	}
 }
 
-func (c *Client) Call(method string, params map[string]interface{}) JsonRPCResponse {
+func (c *Client) Call(method string, params map[string]interface{}) (interface{}, error) {
 
 	responseChan := make(chan JsonRPCResponse, 1)
 	c.responseMutex.Lock()
@@ -155,8 +161,10 @@ func (c *Client) Call(method string, params map[string]interface{}) JsonRPCRespo
 	c.outgoing <- request
 	// Wait for the response
 	response := <-responseChan
-
-	return response
+	if response.Error != (JsonRPCError{}) {
+		return nil, errors.New(response.Error.Message)
+	}
+	return response.Result, nil
 }
 
 func (c *Client) Notify(method string, params map[string]interface{}) {
