@@ -1,12 +1,11 @@
 package cmdinput
 
 import (
-	"github.com/rivo/tview"
+	"github.com/MapleLeafMakers/tview"
+	"github.com/gdamore/tcell/v2"
 	"strconv"
 	"strings"
 	"sync"
-
-	"github.com/gdamore/tcell/v2"
 )
 
 const (
@@ -82,12 +81,13 @@ type InputField struct {
 	// An optional autocomplete function which receives the current text of the
 	// input field and returns a slice of strings to be displayed in a drop-down
 	// selection.
-	autocomplete func(text string) []string
+	autocomplete func(text string, cursorPos int) ([]string, int)
 
 	// The List object which shows the selectable autocomplete entries. If not
 	// nil, the list's main texts represent the current autocomplete entries.
-	autocompleteList      *tview.List
-	autocompleteListMutex sync.Mutex
+	autocompleteListOffset int
+	autocompleteList       *tview.List
+	autocompleteListMutex  sync.Mutex
 
 	// The styles of the autocomplete entries.
 	autocompleteStyles struct {
@@ -284,7 +284,7 @@ func (i *InputField) SetDisabled(disabled bool) tview.FormItem {
 // invoked in this function and whenever the current text changes or when
 // [InputField.Autocomplete] is called. Entries are cleared when the user
 // selects an entry or presses Escape.
-func (i *InputField) SetAutocompleteFunc(callback func(currentText string) (entries []string)) *InputField {
+func (i *InputField) SetAutocompleteFunc(callback func(currentText string, cursorPos int) (entries []string, menuOffset int)) *InputField {
 	i.autocomplete = callback
 	i.Autocomplete()
 	return i
@@ -325,7 +325,8 @@ func (i *InputField) Autocomplete() *InputField {
 
 	// Do we have any autocomplete entries?
 	text := i.textArea.GetText()
-	entries := i.autocomplete(text)
+	_, cursorPos, _, _ := i.textArea.GetCursor()
+	entries, menuOffset := i.autocomplete(text, cursorPos)
 	if len(entries) == 0 {
 		// No entries, no list.
 		i.autocompleteList = nil
@@ -341,6 +342,8 @@ func (i *InputField) Autocomplete() *InputField {
 			SetHighlightFullLine(true).
 			SetBackgroundColor(i.autocompleteStyles.background)
 	}
+	// store the menuOffset returned from the tab completer
+	i.autocompleteListOffset = menuOffset
 
 	// Fill it with the entries.
 	currentEntry := -1
@@ -448,7 +451,7 @@ func (i *InputField) Draw(screen tcell.Screen) {
 	i.textArea.SetRect(x, y, labelWidth+fieldWidth, 1)
 	// i.textArea.setMinCursorPadding(fieldWidth-1, 1)
 	// Draw text area.
-	i.textArea.Focus(nil) //hasFocus = i.HasFocus() // Force cursor positioning.
+	i.textArea.SetHasFocus(i.HasFocus()) // Force cursor positioning.
 	i.textArea.Draw(screen)
 
 	// Draw autocomplete list.
@@ -467,8 +470,7 @@ func (i *InputField) Draw(screen tcell.Screen) {
 		}
 
 		// We prefer to drop down but if there is no space, maybe drop up?
-		_, cursorPos, _, _ := i.textArea.GetCursor()
-		lx := x + labelWidth + cursorPos
+		lx := x + labelWidth + i.autocompleteListOffset
 		ly := y + 1
 		_, sheight := screen.Size()
 		if ly+lheight >= sheight && ly-2 > lheight-ly {

@@ -1,11 +1,17 @@
 package jsonrpcclient
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"github.com/gorilla/websocket"
+	"io"
 	"log"
+	"mime/multipart"
+	"net/http"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strconv"
 	"sync"
 )
@@ -115,7 +121,6 @@ func (c *Client) readMessages() {
 				JsonRPC: "2.0",
 			}
 			if payload["params"] != nil {
-				log.Println("other Params", payload["params"])
 				req.Params, _ = payload["params"].([]interface{})
 			}
 			c.Incoming <- req
@@ -182,4 +187,34 @@ func (c *Client) Notify(method string, params map[string]interface{}) {
 func (c *Client) Close() {
 	c.connection.Close()
 	close(c.outgoing)
+}
+
+func (c *Client) Upload(filename string, startPrint bool) {
+	u, err := url.Parse(c.Url)
+	if err != nil {
+		panic(err)
+	}
+	log.Printf("Uploading to %#v", u)
+
+	u.Scheme = "http"
+	u.Path = "/server/files/upload"
+	log.Println("Upload Url: ", u)
+	file, _ := os.Open(filename)
+	defer file.Close()
+
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+	writer.WriteField("print", strconv.FormatBool(startPrint))
+	part, _ := writer.CreateFormFile("file", filepath.Base(file.Name()))
+	io.Copy(part, file)
+	writer.Close()
+
+	r, _ := http.NewRequest("POST", u.String(), body)
+	r.Header.Add("Content-Type", writer.FormDataContentType())
+	client := &http.Client{}
+	res, err := client.Do(r)
+	if err != nil {
+		panic(err)
+	}
+	log.Printf("RES: %#v", res)
 }

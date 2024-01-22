@@ -5,6 +5,7 @@ import (
 	"github.com/gdamore/tcell/v2"
 	"github.com/google/shlex"
 	"log"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
@@ -32,24 +33,26 @@ func NewTabCompleter() TabCompleter {
 	return TabCompleter{
 		completer: CommandTokenCompleter{
 			Registry:   map[string]Command{},
+			caseMap:    map[string]string{},
 			ContextKey: "cmd",
 		},
 	}
 }
 
 func (t *TabCompleter) RegisterCommand(cmd string, command Command) {
-	t.completer.Registry[strings.ToLower(cmd)] = command
+	t.completer.caseMap[strings.ToLower(cmd)] = cmd
+	t.completer.Registry[cmd] = command
 }
 
-func (t *TabCompleter) AutoComplete(currentText string, cursorPos int, ctx CommandContext) (entries []string) {
+func (t *TabCompleter) AutoComplete(currentText string, cursorPos int, ctx CommandContext) (entries []string, menuOffset int) {
 	inText := currentText[:cursorPos]
 	tokens, err := shlex.Split(inText)
 	if err != nil {
-		return entries
+		return entries, menuOffset
 	}
 	log.Printf("Autocompleting `%s`[%d]` %+v", inText, cursorPos, tokens)
 	if len(tokens) == 0 {
-		return nil
+		return entries, menuOffset
 	}
 	if strings.HasSuffix(inText, " ") {
 		tokens = append(tokens, "")
@@ -64,7 +67,7 @@ func (t *TabCompleter) AutoComplete(currentText string, cursorPos int, ctx Comma
 		if i == lastTokenIdx {
 			// this is the one we're completing
 			results, _ := currentCompleter.Complete(token, ctx)
-			return results
+			return results, strings.LastIndex(inText, tokens[lastTokenIdx])
 		} else {
 			// these tokens are ones we're just matching through to get to the right one
 			match, _, next := currentCompleter.Match(token, ctx)
@@ -79,17 +82,17 @@ func (t *TabCompleter) AutoComplete(currentText string, cursorPos int, ctx Comma
 			currentCompleter = *next
 		}
 	}
-	return entries
+	return entries, menuOffset
 }
 
 func (t *TabCompleter) OnAutoCompleted(text string, index, source int) (closeMenu bool, fullText string, cursorPos int) {
 	switch source {
 	case AutocompletedNavigate:
-		log.Println("AutoCOmpletedNav")
 		return false, t.completionState.RawText, t.completionState.CursorPos
 	default:
 		currentText := t.completionState.RawText
 		inText := currentText[:t.completionState.CursorPos]
+		log.Printf("Completing %s with %s <%+v>[%d]", inText, text, t.completionState, len(t.completionState.tokens))
 		afterText := currentText[t.completionState.CursorPos:]
 		preText := inText[:strings.LastIndex(inText, t.completionState.tokens[len(t.completionState.tokens)-1])]
 		return true, preText + text + afterText, len(preText) + len(text)
@@ -131,13 +134,15 @@ type Command interface {
 type CommandTokenCompleter struct {
 	ContextKey string
 	Registry   map[string]Command
+	caseMap    map[string]string
 }
 
 func (c CommandTokenCompleter) Match(token string, ctx CommandContext) (bool, string, *TokenCompleter) {
-	cmd, ok := c.Registry[strings.ToLower(token)]
+	key, ok := c.caseMap[strings.ToLower(token)]
 	if !ok {
 		return false, "", nil
 	}
+	cmd := c.Registry[key]
 	ctx[c.ContextKey] = cmd
 	completer := cmd.GetCompleter(ctx)
 	return true, token, &completer
@@ -145,8 +150,8 @@ func (c CommandTokenCompleter) Match(token string, ctx CommandContext) (bool, st
 
 func (c CommandTokenCompleter) Complete(token string, ctx CommandContext) (results []string, match bool) {
 	lowerToken := strings.ToLower(token)
-	sortedKeys := make([]string, 0, len(c.Registry))
-	for k, _ := range c.Registry {
+	sortedKeys := make([]string, 0, len(c.caseMap))
+	for k, _ := range c.caseMap {
 		sortedKeys = append(sortedKeys, k)
 	}
 	sort.Strings(sortedKeys)
@@ -155,7 +160,7 @@ func (c CommandTokenCompleter) Complete(token string, ctx CommandContext) (resul
 			if lowerCmdName == lowerToken {
 				match = true
 			}
-			results = append(results, lowerCmdName)
+			results = append(results, c.caseMap[lowerCmdName])
 		}
 	}
 	return results, match
@@ -273,4 +278,37 @@ func (c ColorTokenCompleter) Complete(token string, ctx CommandContext) (results
 		}
 	}
 	return results, match
+}
+
+// FileTokenCompleter
+
+type FileTokenCompleter struct {
+	ContextKey string
+	Next       TokenCompleter
+}
+
+func NewFileTokenCompleter(contextKey string, nextCompleter TokenCompleter) FileTokenCompleter {
+	return FileTokenCompleter{
+		contextKey, nextCompleter,
+	}
+}
+
+func (f FileTokenCompleter) Match(token string, ctx CommandContext) (bool, string, *TokenCompleter) {
+	ctx[f.ContextKey] = token
+	return true, token, &f.Next
+}
+
+func (f FileTokenCompleter) Complete(token string, ctx CommandContext) (result []string, match bool) {
+	var pattern string
+	if filepath.IsLocal(token) {
+		pattern = filepath.Clean(token)
+	} else {
+		pattern = token
+	}
+	matches, err := filepath.Glob(pattern + "*")
+	for i := 0; i < len(matches); i++ {
+		matches[i] = strings.ReplaceAll(matches[i], " ", "\\ ")
+	}
+	log.Println("token", token, "pp", matches, err, "pattern", pattern)
+	return matches, false
 }

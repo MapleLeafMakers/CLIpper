@@ -1,7 +1,7 @@
 package cmdinput
 
 import (
-	"github.com/rivo/tview"
+	"github.com/MapleLeafMakers/tview"
 	"math/rand"
 	"regexp"
 	"strconv"

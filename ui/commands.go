@@ -94,6 +94,7 @@ func (c Command_Quit) GetCompleter(ctx cmdinput.CommandContext) cmdinput.TokenCo
 	return nil
 }
 
+// /rpc
 type Command_RPC struct{}
 
 func (c Command_RPC) Call(ctx cmdinput.CommandContext) error {
@@ -101,14 +102,16 @@ func (c Command_RPC) Call(ctx cmdinput.CommandContext) error {
 	rawCommand := ctx["raw"].(string)
 	parts := strings.SplitN(rawCommand, " ", 3)
 	var payload map[string]interface{}
-	err := json.Unmarshal([]byte(parts[2]), &payload)
-	if err != nil {
-		log.Println("Returning Error", err)
-		return err
+	if len(parts) == 2 {
+		payload = map[string]interface{}{}
+	} else {
+		err := json.Unmarshal([]byte(parts[2]), &payload)
+		if err != nil {
+			log.Println("Returning Error", err)
+			return err
+		}
 	}
-	var resp interface{}
-	resp, err = tui.RpcClient.Call(ctx["method"].(string), payload)
-
+	resp, _ := tui.RpcClient.Call(ctx["method"].(string), payload)
 	tui.App.QueueUpdateDraw(func() {
 		tui.Output.Write(dumpToJson(resp))
 	})
@@ -125,4 +128,59 @@ func (c Command_RPC) GetCompleter(ctx cmdinput.CommandContext) cmdinput.TokenCom
 		ContextKey: "method",
 		Registry:   reg,
 	}
+}
+
+// /restart
+type Command_Restart struct{}
+
+func (c Command_Restart) Call(ctx cmdinput.CommandContext) error {
+	tui, _ := ctx["tui"].(*TUI)
+	tui.RpcClient.Call("printer.restart", map[string]interface{}{})
+	return nil
+}
+
+func (c Command_Restart) GetCompleter(ctx cmdinput.CommandContext) cmdinput.TokenCompleter {
+	return nil
+}
+
+// /firmware_restart
+type Command_FirmwareRestart struct{}
+
+func (c Command_FirmwareRestart) Call(ctx cmdinput.CommandContext) error {
+	tui, _ := ctx["tui"].(*TUI)
+	tui.RpcClient.Call("printer.firmware_restart", map[string]interface{}{})
+	return nil
+}
+
+func (c Command_FirmwareRestart) GetCompleter(ctx cmdinput.CommandContext) cmdinput.TokenCompleter {
+	return nil
+}
+
+// /estop
+type Command_EStop struct{}
+
+func (c Command_EStop) Call(ctx cmdinput.CommandContext) error {
+	tui, _ := ctx["tui"].(*TUI)
+	tui.RpcClient.Call("printer.emergency_stop", map[string]interface{}{})
+	return nil
+}
+
+func (c Command_EStop) GetCompleter(ctx cmdinput.CommandContext) cmdinput.TokenCompleter {
+	return nil
+}
+
+// /print
+
+type Command_Print struct{}
+
+func (c Command_Print) Call(ctx cmdinput.CommandContext) error {
+
+	//file := ctx["file"].(string)
+	tui, _ := ctx["tui"].(*TUI)
+	tui.RpcClient.Upload(ctx["file"].(string), true)
+	return nil
+}
+
+func (c Command_Print) GetCompleter(ctx cmdinput.CommandContext) cmdinput.TokenCompleter {
+	return cmdinput.NewFileTokenCompleter("file", nil)
 }

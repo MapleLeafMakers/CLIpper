@@ -3,17 +3,13 @@ module clipper
 go 1.21.6
 
 require (
-	github.com/charmbracelet/bubbles v0.17.1
-	github.com/charmbracelet/bubbletea v0.25.0
-	github.com/charmbracelet/lipgloss v0.9.1
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/gorilla/websocket v1.5.1
 	github.com/mattn/go-runewidth v0.0.15
-	github.com/muesli/reflow v0.3.0
-	github.com/muesli/termenv v0.15.2
 )
 
 require (
+	github.com/MapleLeafMakers/tview v0.0.0-20240121224556-10b176dd0850 // indirect
 	github.com/atotto/clipboard v0.1.4 // indirect
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
 	github.com/bykof/gostradamus v1.1.1 // indirect
@@ -36,3 +32,5 @@ require (
 	golang.org/x/term v0.15.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
 )
+
+replace github.com/MapleLeafMakers/tview => ../tview

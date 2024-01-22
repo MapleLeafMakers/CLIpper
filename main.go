@@ -69,9 +69,9 @@ func main() {
 			"\n\t" + os.Args[0] + " myvzero.local 6969" +
 			"\n\t" + os.Args[0] + " 192.168.1.69:8000\n")
 		os.Exit(1)
-
 		url = "ws://localhost/websocket"
 	}
-
+	log.Println(url)
+	//ui.RunApp()
 	StartInteractive(url)
 }
