@@ -4,6 +4,7 @@ import (
 	"clipper/jsonrpcclient"
 	"clipper/ui"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"strings"
@@ -19,6 +20,8 @@ func configureLogger() {
 			panic(err)
 		}
 		log.SetOutput(logFile)
+	} else {
+		log.SetOutput(io.Discard)
 	}
 
 }
