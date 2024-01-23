@@ -8,7 +8,6 @@ import (
 	"github.com/MapleLeafMakers/tview"
 	"github.com/bykof/gostradamus"
 	"github.com/gdamore/tcell/v2"
-	"reflect"
 	"sync"
 	"time"
 )
@@ -58,17 +57,18 @@ func (l LogContent) GetColumnCount() int {
 }
 
 type TUI struct {
-	App          *tview.Application
-	Root         *tview.Grid
-	Input        *cmdinput.InputField
-	Output       *LogContent
-	RpcClient    *jsonrpcclient.Client
-	TabCompleter cmdinput.TabCompleter
-	State        map[string]map[string]interface{}
-	Settings     Settings
-	HostHeader   *tview.TextView
-
-	hostname string
+	App               *tview.Application
+	Root              *tview.Grid
+	Input             *cmdinput.InputField
+	Output            *LogContent
+	RpcClient         *jsonrpcclient.Client
+	TabCompleter      cmdinput.TabCompleter
+	State             map[string]map[string]interface{}
+	Settings          Settings
+	HostHeader        *tview.TextView
+	TemperaturesPanel *TemperaturePanelContent
+	ToolheadPanel     *ToolheadPanelContent
+	hostname          string
 }
 
 func NewTUI(rpcClient *jsonrpcclient.Client) *TUI {
@@ -89,8 +89,6 @@ func NewTUI(rpcClient *jsonrpcclient.Client) *TUI {
 			tui.Output.table.InputHandler()(event, func(p tview.Primitive) {})
 			return nil
 		case tcell.KeyTab:
-			focused := reflect.TypeOf(tui.App.GetFocus())
-			tui.Output.Write("Focused: " + focused.String())
 			return event
 		default:
 			return event
@@ -168,13 +166,10 @@ func (tui *TUI) buildLeftPanel() {
 	tui.Root.AddItem(flex, 0, 0, 1, 1, 0, 0, true)
 	flex.AddItem(tui.HostHeader, 1, 1, false)
 	tempPanel := NewTemperaturePanel(tui)
+	tui.TemperaturesPanel = &tempPanel
 	flex.AddItem(tempPanel.container, len(tempPanel.sensors)+2, 0, false)
-	//flex.SetFocusFunc(func() { log.Println("leftPanel focused") })
 	toolheadPanel := NewToolheadPanel(tui)
-	//toolheadPanel.container.SetFocusFunc(func() {
-	//	flex.Focus(nil)
-	//	log.Println("thp focused")
-	//})
+	tui.ToolheadPanel = &toolheadPanel
 	flex.AddItem(toolheadPanel.container, 5, 0, true)
 }
 
@@ -259,8 +254,8 @@ func (tui *TUI) subscribe(wg *sync.WaitGroup) {
 	for k, v := range objectsAsMap {
 		state[k] = v.(map[string]interface{})
 	}
+	tui.State = state
 	tui.App.QueueUpdateDraw(func() {
-		tui.State = state
 		//log.Println("Subbed", state)
 	})
 }
@@ -271,7 +266,11 @@ func (tui *TUI) UpdateState(statusChanges map[string]map[string]interface{}) {
 			tui.State[key][subKey] = value
 			// TODO: Notify the relevant UI elements?
 		}
+		if key == "gcode_move" {
+			tui.ToolheadPanel.UpdatePositions()
+		}
 	}
+
 }
 
 func toStatusMap(stat map[string]interface{}) (map[string]map[string]interface{}, error) {
