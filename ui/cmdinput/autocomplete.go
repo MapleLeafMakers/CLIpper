@@ -4,7 +4,6 @@ import (
 	"errors"
 	"github.com/gdamore/tcell/v2"
 	"github.com/google/shlex"
-	"log"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -50,7 +49,6 @@ func (t *TabCompleter) AutoComplete(currentText string, cursorPos int, ctx Comma
 	if err != nil {
 		return entries, menuOffset
 	}
-	log.Printf("Autocompleting `%s`[%d]` %+v", inText, cursorPos, tokens)
 	if len(tokens) == 0 {
 		return entries, menuOffset
 	}
@@ -92,7 +90,6 @@ func (t *TabCompleter) OnAutoCompleted(text string, index, source int) (closeMen
 	default:
 		currentText := t.completionState.RawText
 		inText := currentText[:t.completionState.CursorPos]
-		log.Printf("Completing %s with %s <%+v>[%d]", inText, text, t.completionState, len(t.completionState.tokens))
 		afterText := currentText[t.completionState.CursorPos:]
 		preText := inText[:strings.LastIndex(inText, t.completionState.tokens[len(t.completionState.tokens)-1])]
 		return true, preText + text + afterText, len(preText) + len(text)
@@ -113,7 +110,7 @@ func (t *TabCompleter) Parse(currentText string, ctx CommandContext) error {
 			// bail out, no completions match
 			break
 		}
-		if *next == nil {
+		if next == nil {
 			// we're done
 			break
 		}
@@ -305,10 +302,22 @@ func (f FileTokenCompleter) Complete(token string, ctx CommandContext) (result [
 	} else {
 		pattern = token
 	}
-	matches, err := filepath.Glob(pattern + "*")
+	matches, _ := filepath.Glob(pattern + "*")
 	for i := 0; i < len(matches); i++ {
 		matches[i] = strings.ReplaceAll(matches[i], " ", "\\ ")
 	}
-	log.Println("token", token, "pp", matches, err, "pattern", pattern)
 	return matches, false
+}
+
+type AnythingCompleter struct {
+	ContextKey string
+}
+
+func (a AnythingCompleter) Match(token string, ctx CommandContext) (bool, string, *TokenCompleter) {
+	ctx[a.ContextKey] = token
+	return true, token, nil
+}
+
+func (a AnythingCompleter) Complete(token string, ctx CommandContext) (result []string, match bool) {
+	return []string{}, false
 }

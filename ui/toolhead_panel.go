@@ -3,7 +3,6 @@ package ui
 import (
 	"github.com/MapleLeafMakers/tview"
 	"github.com/gdamore/tcell/v2"
-	"log"
 	"strconv"
 )
 
@@ -22,13 +21,6 @@ func NewToolheadPanel(tui *TUI) ToolheadPanelContent {
 	content.container.AddFormItem(buildAxis(tui, "X"))
 	content.container.AddFormItem(buildAxis(tui, "Y"))
 	content.container.AddFormItem(buildAxis(tui, "Z"))
-	field := content.container.GetFormItem(0).(*tview.InputField)
-	field.SetFocusFunc(func() {
-		log.Println("FieldFocusFunc", content.container.HasFocus())
-	})
-	field.SetDoneFunc(func(key tcell.Key) {
-		log.Println("DoneFunc:", key)
-	})
 	content.container.SetBorder(true).SetTitle("Toolhead").SetTitleColor(tcell.ColorLightYellow)
 	return content
 }

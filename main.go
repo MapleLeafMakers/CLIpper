@@ -71,7 +71,5 @@ func main() {
 		os.Exit(1)
 		url = "ws://localhost/websocket"
 	}
-	log.Println(url)
-	//ui.RunApp()
 	StartInteractive(url)
 }

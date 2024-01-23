@@ -3,6 +3,7 @@ package cmdinput
 import (
 	"github.com/MapleLeafMakers/tview"
 	"github.com/gdamore/tcell/v2"
+	"log"
 	"strconv"
 	"strings"
 	"sync"
@@ -96,6 +97,9 @@ type InputField struct {
 		background tcell.Color
 	}
 
+	commandHistory      []string
+	commandHistoryIndex int
+
 	// An optional function which is called when the user selects an
 	// autocomplete entry. The text and index of the selected entry (within the
 	// list) is provided, as well as the user action causing the selection (one
@@ -122,20 +126,28 @@ type InputField struct {
 
 // NewInputField returns a new input field.
 func NewInputField() *InputField {
+
 	i := &InputField{
 		Box:      tview.NewBox(),
 		textArea: tview.NewTextArea().SetWrap(false),
 	}
+
 	i.textArea.SetChangedFunc(func() {
 		if i.changed != nil {
 			i.changed(i.textArea.GetText())
 		}
 	})
+
 	i.textArea.SetTextStyle(tcell.StyleDefault.Background(tview.Styles.ContrastBackgroundColor).Foreground(tview.Styles.PrimaryTextColor))
 	i.textArea.SetPlaceholderStyle(tcell.StyleDefault.Background(tview.Styles.ContrastBackgroundColor).Foreground(tview.Styles.ContrastSecondaryTextColor))
 	i.autocompleteStyles.main = tcell.StyleDefault.Foreground(tview.Styles.PrimitiveBackgroundColor)
 	i.autocompleteStyles.selected = tcell.StyleDefault.Background(tview.Styles.PrimaryTextColor).Foreground(tcell.ColorDarkMagenta)
 	i.autocompleteStyles.background = tview.Styles.MoreContrastBackgroundColor
+
+	commandHistory := make([]string, 0, 200)
+	commandHistory = append(commandHistory, "")
+	i.commandHistory = commandHistory
+	i.commandHistoryIndex = 0
 	return i
 }
 
@@ -531,6 +543,7 @@ func (i *InputField) InputHandler() func(event *tcell.EventKey, setFocus func(p 
 					if i.autocompleted(stripTags(text), index, source) {
 						i.autocompleteList = nil
 						currentText = i.GetText()
+						i.updateCurrentHistoryEntry()
 					}
 				} else {
 					i.SetText(text)
@@ -570,8 +583,15 @@ func (i *InputField) InputHandler() func(event *tcell.EventKey, setFocus func(p 
 		switch key := event.Key(); key {
 		case tcell.KeyDown:
 			i.autocompleteListMutex.Unlock() // We're still holding a lock.
-			i.Autocomplete()
+			//i.Autocomplete()
 			i.autocompleteListMutex.Lock()
+			i.HistoryDown()
+			skipAutocomplete = true
+			log.Printf("%+v, %#q", i.commandHistoryIndex, i.commandHistory)
+		case tcell.KeyUp:
+			i.HistoryUp()
+			skipAutocomplete = true
+			log.Printf("%+v, %#q", i.commandHistoryIndex, i.commandHistory)
 		case tcell.KeyEnter, tcell.KeyEscape, tcell.KeyTab, tcell.KeyBacktab:
 			finish(key)
 		case tcell.KeyRune:
@@ -590,7 +610,9 @@ func (i *InputField) InputHandler() func(event *tcell.EventKey, setFocus func(p 
 		default:
 			// Forward other key events to the text area.
 			i.textArea.InputHandler()(event, setFocus)
+			i.updateCurrentHistoryEntry()
 		}
+		//i.updateCurrentHistoryEntry()
 	})
 }
 
@@ -663,4 +685,40 @@ func (i *InputField) SetCursor(cursorPos int) {
 
 func (i *InputField) Clear() {
 	i.textArea.SetText("", true)
+}
+
+func (i *InputField) HistoryUp() {
+	i.nextHistory(-1)
+}
+
+func (i *InputField) HistoryDown() {
+	i.nextHistory(1)
+}
+
+func (i *InputField) nextHistory(dir int) {
+	idx := (i.commandHistoryIndex + dir)
+	if idx < 0 {
+		idx = 0
+	} else if idx >= len(i.commandHistory) {
+		idx = len(i.commandHistory) - 1
+	}
+	i.commandHistoryIndex = idx
+	i.textArea.SetText(i.commandHistory[i.commandHistoryIndex], true)
+}
+
+func (i *InputField) NewCommand() {
+	if i.commandHistoryIndex != len(i.commandHistory)-1 {
+		i.commandHistory[len(i.commandHistory)-1] = i.GetText()
+	}
+
+	i.commandHistory = append(i.commandHistory, "")
+	i.commandHistoryIndex = len(i.commandHistory) - 1
+	i.Clear()
+}
+
+func (i *InputField) updateCurrentHistoryEntry() {
+	log.Println("Updating current History")
+	if i.commandHistoryIndex == len(i.commandHistory)-1 {
+		i.commandHistory[i.commandHistoryIndex] = i.GetText()
+	}
 }

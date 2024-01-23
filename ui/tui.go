@@ -8,9 +8,9 @@ import (
 	"github.com/MapleLeafMakers/tview"
 	"github.com/bykof/gostradamus"
 	"github.com/gdamore/tcell/v2"
-	"log"
 	"reflect"
 	"sync"
+	"time"
 )
 
 type LogEntry struct {
@@ -36,7 +36,13 @@ func (l LogContent) GetCell(row, column int) *tview.TableCell {
 
 	switch column {
 	case 0:
-		return tview.NewTableCell(l.entries[row].Timestamp.Format(" hh:mma")).SetBackgroundColor(tcell.NewRGBColor(64, 64, 64))
+		var txt string
+		if l.entries[row].Timestamp.Time().IsZero() {
+			txt = ""
+		} else {
+			txt = l.entries[row].Timestamp.Format(" " + AppSettings["theme.timestampFormat"].(string))
+		}
+		return tview.NewTableCell(txt).SetBackgroundColor(tcell.NewRGBColor(64, 64, 64))
 	case 1:
 		return tview.NewTableCell(" " + l.entries[row].Message)
 	}
@@ -133,7 +139,6 @@ func (tui *TUI) buildInput() {
 			}
 			err := tui.TabCompleter.Parse(tui.Input.GetText(), ctx)
 			if err == nil {
-				log.Println("Executing", ctx)
 				cmd, ok := ctx["cmd"]
 				// ew
 				if ok {
@@ -145,7 +150,7 @@ func (tui *TUI) buildInput() {
 					//not a registered command, send it as gcode.
 					go (func() { NewGcodeCommand("", "").Call(ctx) })()
 				}
-				tui.Input.Clear()
+				tui.Input.NewCommand()
 			} else if err.Error() == "NoInput" {
 
 			} else {
@@ -189,18 +194,18 @@ func (tui *TUI) initialize() {
 func (tui *TUI) buildOutput(numLines int) {
 
 	output := tview.NewTable()
-	ts := gostradamus.Now()
+	ts := gostradamus.DateTimeFromTime(time.Time{})
 	lines := make([]LogEntry, numLines)
 	i := 0
 	for i = 0; i < numLines-6; i++ {
 		lines[i] = LogEntry{ts, ""}
 	}
-	lines[i+0] = LogEntry{ts, "[yellow]   ________    ____                     "}
-	lines[i+1] = LogEntry{ts, "[yellow]  / ____/ /   /  _/___  ____  ___  _____"}
-	lines[i+2] = LogEntry{ts, "[yellow] / /   / /    / // __ \\/ __ \\/ _ \\/ ___/"}
-	lines[i+3] = LogEntry{ts, "[yellow]/ /___/ /____/ // /_/ / /_/ /  __/ /    "}
-	lines[i+4] = LogEntry{ts, "[yellow]\\____/_____/___/ .___/ .___/\\___/_/     "}
-	lines[i+5] = LogEntry{ts, "[yellow]              /_/   /_/                 "}
+	lines[i+0] = LogEntry{gostradamus.Now(), "[yellow]   ________    ____                     "}
+	lines[i+1] = LogEntry{gostradamus.Now(), "[yellow]  / ____/ /   /  _/___  ____  ___  _____"}
+	lines[i+2] = LogEntry{gostradamus.Now(), "[yellow] / /   / /    / // __ \\/ __ \\/ _ \\/ ___/"}
+	lines[i+3] = LogEntry{gostradamus.Now(), "[yellow]/ /___/ /____/ // /_/ / /_/ /  __/ /    "}
+	lines[i+4] = LogEntry{gostradamus.Now(), "[yellow]\\____/_____/___/ .___/ .___/\\___/_/     "}
+	lines[i+5] = LogEntry{gostradamus.Now(), "[yellow]              /_/   /_/                 "}
 
 	tui.Output = &LogContent{
 		table:   output,
@@ -254,7 +259,6 @@ func (tui *TUI) subscribe(wg *sync.WaitGroup) {
 	for k, v := range objectsAsMap {
 		state[k] = v.(map[string]interface{})
 	}
-	log.Println("Queuing update for subs")
 	tui.App.QueueUpdateDraw(func() {
 		tui.State = state
 		//log.Println("Subbed", state)
@@ -330,7 +334,6 @@ func (tui *TUI) loadGcodeHelp() {
 	}
 	tui.App.QueueUpdate(func() {
 		for k, help := range resp.(map[string]interface{}) {
-			log.Println("Registered GCODE Command: " + k)
 			tui.TabCompleter.RegisterCommand(k, NewGcodeCommand(k, help.(string)))
 		}
 	})

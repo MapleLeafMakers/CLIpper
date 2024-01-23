@@ -139,8 +139,6 @@ func (c *Client) writeMessages() {
 			log.Println("write error:", err)
 			c.isConnected = false
 			return
-		} else {
-			log.Println("Sent: ", string(encoded))
 		}
 	}
 }
@@ -194,11 +192,8 @@ func (c *Client) Upload(filename string, startPrint bool) {
 	if err != nil {
 		panic(err)
 	}
-	log.Printf("Uploading to %#v", u)
-
 	u.Scheme = "http"
 	u.Path = "/server/files/upload"
-	log.Println("Upload Url: ", u)
 	file, _ := os.Open(filename)
 	defer file.Close()
 
@@ -212,9 +207,8 @@ func (c *Client) Upload(filename string, startPrint bool) {
 	r, _ := http.NewRequest("POST", u.String(), body)
 	r.Header.Add("Content-Type", writer.FormDataContentType())
 	client := &http.Client{}
-	res, err := client.Do(r)
+	_, err = client.Do(r)
 	if err != nil {
 		panic(err)
 	}
-	log.Printf("RES: %#v", res)
 }

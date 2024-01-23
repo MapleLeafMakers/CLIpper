@@ -4,7 +4,6 @@ import (
 	"clipper/ui/cmdinput"
 	"encoding/json"
 	"fmt"
-	"log"
 	"strings"
 )
 
@@ -41,16 +40,7 @@ func NewGcodeCommand(name, help string) GcodeCommand {
 // /set command
 type Command_Set struct{}
 
-var Completer_Set = cmdinput.StaticTokenCompleter{
-	"setting",
-	map[string]cmdinput.TokenCompleter{
-		"foo": cmdinput.NewBoolTokenCompleter("value", nil),
-		"bar": cmdinput.NewBoolTokenCompleter("value", nil),
-	},
-}
-
 func (c Command_Set) Call(ctx cmdinput.CommandContext) error {
-	log.Printf("Set Command called with %+v", ctx)
 	tui, _ := ctx["tui"].(*TUI)
 	key, _ := ctx["setting"].(string)
 	value := ctx["value"]
@@ -107,7 +97,6 @@ func (c Command_RPC) Call(ctx cmdinput.CommandContext) error {
 	} else {
 		err := json.Unmarshal([]byte(parts[2]), &payload)
 		if err != nil {
-			log.Println("Returning Error", err)
 			return err
 		}
 	}
