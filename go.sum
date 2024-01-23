@@ -1,3 +1,5 @@
+github.com/MapleLeafMakers/tview v0.0.0-20240121224556-10b176dd0850 h1:KloYJqlEHBJNXI6lUu0qx53LijYM/XMNXVpeYrIak84=
+github.com/MapleLeafMakers/tview v0.0.0-20240121224556-10b176dd0850/go.mod h1:9XT212re5LE/MTC3Ca+plCog9b+LKu7NDZTdly9lbcQ=
 github.com/bykof/gostradamus v1.1.1 h1:gPT79tGdVHqbljQ/DKtrEJHW20/w6iOHNowYzGdw0n0=
 github.com/bykof/gostradamus v1.1.1/go.mod h1:j9M67kpM2fkrq6LMt7TE5RcvpLLmgxPGE6XegFdhj6M=
 github.com/davecgh/go-spew v1.1.0 h1:ZDRjVQ15GmhC3fiQ8ni8+OwkZQO4DARzQgrnXU1Liz8=
