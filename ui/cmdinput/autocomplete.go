@@ -256,7 +256,7 @@ func (c ColorTokenCompleter) Match(token string, ctx CommandContext) (bool, stri
 	if color == tcell.ColorDefault {
 		return false, "", nil
 	}
-	ctx[c.ContextKey] = color
+	ctx[c.ContextKey] = token
 	return true, token, &c.Next
 }
 
@@ -266,6 +266,7 @@ func (c ColorTokenCompleter) Complete(token string, ctx CommandContext) (results
 	for k, _ := range tcell.ColorNames {
 		sortedKeys = append(sortedKeys, k)
 	}
+	sort.Strings(sortedKeys)
 	for _, colorName := range sortedKeys {
 		if strings.HasPrefix(colorName, lowerToken) {
 			if colorName == lowerToken {

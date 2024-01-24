@@ -39,7 +39,7 @@ func (l LogContent) GetCell(row, column int) *tview.TableCell {
 		if l.entries[row].Timestamp.Time().IsZero() {
 			txt = ""
 		} else {
-			txt = l.entries[row].Timestamp.Format(" " + AppSettings["theme.timestampFormat"].(string))
+			txt = l.entries[row].Timestamp.Format(" " + AppConfig.TimestampFormat)
 		}
 		return tview.NewTableCell(txt).SetBackgroundColor(tcell.NewRGBColor(64, 64, 64))
 	case 1:
@@ -64,7 +64,6 @@ type TUI struct {
 	RpcClient         *jsonrpcclient.Client
 	TabCompleter      cmdinput.TabCompleter
 	State             map[string]map[string]interface{}
-	Settings          Settings
 	HostHeader        *tview.TextView
 	TemperaturesPanel *TemperaturePanelContent
 	ToolheadPanel     *ToolheadPanelContent
@@ -77,7 +76,6 @@ func NewTUI(rpcClient *jsonrpcclient.Client) *TUI {
 	}
 
 	tview.Styles.PrimitiveBackgroundColor = tcell.ColorDefault
-	tui.Settings = AppSettings
 	tui.buildInput()
 	tui.buildOutput(100)
 	tui.buildWindow()
@@ -212,6 +210,7 @@ func (tui *TUI) buildOutput(numLines int) {
 
 func (tui *TUI) buildWindow() {
 	tui.Root = tview.NewGrid().
+		SetBordersColor(tview.Styles.BorderColor).
 		SetRows(0, 1).
 		SetColumns(36, 0).
 		SetBorders(true).
@@ -233,6 +232,13 @@ func getObjectList(client *jsonrpcclient.Client) []string {
 		res = append(res, o.(string))
 	}
 	return res
+}
+
+func (tui *TUI) UpdateTheme() {
+	// update the colors of everything, since there doesn't seem to be a better way
+	tui.Root.SetBordersColor(tcell.GetColor(string(AppConfig.Theme.BorderColor)))
+	tui.ToolheadPanel.container.SetBorderColor(tcell.GetColor(string(AppConfig.Theme.BorderColor)))
+	tui.TemperaturesPanel.container.SetBorderColor(tcell.GetColor(string(AppConfig.Theme.BorderColor)))
 }
 
 func (tui *TUI) subscribe(wg *sync.WaitGroup) {
@@ -288,7 +294,7 @@ func toStatusMap(stat map[string]interface{}) (map[string]map[string]interface{}
 func (tui *TUI) handleIncoming() {
 
 	for {
-		logIncoming, _ := AppSettings["logIncoming"].(bool)
+
 		incoming := <-tui.RpcClient.Incoming
 		switch incoming.Method {
 		case "notify_status_update":
@@ -296,7 +302,7 @@ func (tui *TUI) handleIncoming() {
 			statusMap, _ := toStatusMap(status)
 			tui.App.QueueUpdateDraw(func() {
 				tui.UpdateState(statusMap)
-				if logIncoming {
+				if AppConfig.LogIncoming {
 					out, _ := json.MarshalIndent(status, "", " ")
 					tui.Output.Write(string(out))
 				}

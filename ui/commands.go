@@ -44,8 +44,10 @@ func (c Command_Set) Call(ctx cmdinput.CommandContext) error {
 	tui, _ := ctx["tui"].(*TUI)
 	key, _ := ctx["setting"].(string)
 	value := ctx["value"]
-	tui.Settings[key] = value
+	AppConfig.Set(key, value.(string))
+	tui.UpdateTheme()
 	tui.Output.Write(fmt.Sprintf("Set %s to %+v", key, value))
+	AppConfig.Save()
 	return nil
 }
 
@@ -58,7 +60,7 @@ type Command_Settings struct{}
 
 func (c Command_Settings) Call(ctx cmdinput.CommandContext) error {
 	tui, _ := ctx["tui"].(*TUI)
-	str, err := json.MarshalIndent(tui.Settings, "", " ")
+	str, err := json.MarshalIndent(AppConfig, "", " ")
 	if err != nil {
 		panic(err)
 	} else {

@@ -48,7 +48,8 @@ func StartInteractive(url string) {
 func main() {
 
 	configureLogger()
-
+	ui.AppConfig.Load()
+	log.Printf("%#v", ui.AppConfig)
 	args := os.Args[1:]
 	var url string
 	switch len(args) {
@@ -72,7 +73,8 @@ func main() {
 			"\n\t" + os.Args[0] + " myvzero.local 6969" +
 			"\n\t" + os.Args[0] + " 192.168.1.69:8000\n")
 		os.Exit(1)
-		url = "ws://localhost/websocket"
+
 	}
+	//log.Println(url)
 	StartInteractive(url)
 }
