@@ -7,7 +7,7 @@ A text-based interface for [Klipper](https://www.klipper3d.org/) & [Moonraker](h
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![GitHub Release](https://img.shields.io/github/v/release/MapleLeafMakers/CLIpper?label=Release)](https://github.com/MapleLeafMakers/CLIpper/releases/latest)
 
-## Warning
+## ⚠️ Warning
 
 CLIpper is still in very early development, and lacks *many* features.  It is not currently an acceptable replacement for other interfaces unless you speak fluent gcode.
 
