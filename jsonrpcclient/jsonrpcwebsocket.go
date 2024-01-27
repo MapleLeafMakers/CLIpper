@@ -2,31 +2,36 @@ package jsonrpcclient
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"github.com/gorilla/websocket"
 	"io"
 	"log"
 	"mime/multipart"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
 	"sync"
+	"time"
 )
 
 type Client struct {
 	Url              string
 	connection       *websocket.Conn
 	mutex            sync.Mutex
-	isConnected      bool
+	IsConnected      bool
 	Incoming         chan IncomingJsonRPCRequest
 	outgoing         chan JsonRPCRequest
 	responseHandlers map[string]chan JsonRPCResponse
 	responseMutex    sync.Mutex
 	nextId           int
-	closing          bool
+	ctx              context.Context
+	cancel           context.CancelFunc
 }
 
 type JsonRPCRequest struct {
@@ -64,38 +69,71 @@ func NewClient(url string) *Client {
 	}
 }
 
-func (c *Client) Connect() error {
-	var err error
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
-
-	if c.isConnected {
-		return nil
-	}
-
-	u, _ := url.Parse(c.Url)
-	c.connection, _, err = websocket.DefaultDialer.Dial(u.String(), nil)
+func (c *Client) connect() error {
+	// Connect to the WebSocket server
+	conn, _, err := websocket.DefaultDialer.Dial(c.Url, http.Header{})
 	if err != nil {
 		return err
 	}
+	c.connection = conn
+	return nil
+}
 
-	c.isConnected = true
+func (c *Client) Start() error {
+	c.ctx, c.cancel = context.WithCancel(context.Background())
+	if err := c.connect(); err != nil {
+		return err
+	}
 	go c.readMessages()
 	go c.writeMessages()
+	c.IsConnected = true
+	c.emitConnected()
+	return nil
+}
+
+func (c *Client) Stop(emit bool) error {
+	if c.cancel != nil {
+		c.cancel()
+	}
+
+	if c.connection != nil {
+		c.connection.Close()
+		c.IsConnected = false
+		if emit {
+			c.emitDisconnected()
+		}
+	}
 	return nil
 }
 
 func (c *Client) readMessages() {
-	defer close(c.Incoming)
 	for {
-		_, message, err := c.connection.ReadMessage()
-		if err != nil {
-			log.Println("read error:", err)
-			c.isConnected = false
-			c.Connect()
-			return
-		}
+		c.connection.SetReadDeadline(time.Now().Add(time.Second * 1))
 
+		_, message, err := c.connection.ReadMessage()
+
+		if err != nil {
+			if websocket.IsCloseError(err, websocket.CloseNormalClosure) {
+				// Normal closure, exit the loop
+				return
+			} else if e, ok := err.(net.Error); ok && e.Timeout() {
+				// Read timeout occurred, check for shutdown signal and continue
+				select {
+				case <-c.ctx.Done():
+					return
+				default:
+					continue
+				}
+			} else {
+				// An actual error occurred, handle it
+				log.Println("Error reading message:", err)
+				c.IsConnected = false
+				c.Stop(true)
+				//c.Reconnect()
+				return
+			}
+		}
+		// handle a message
 		var payload map[string]interface{}
 		json.Unmarshal(message, &payload)
 		if id, ok := payload["id"].(string); ok {
@@ -116,7 +154,6 @@ func (c *Client) readMessages() {
 			c.responseMutex.Unlock()
 		} else if method, ok := payload["method"].(string); ok {
 			// incoming request
-
 			req := IncomingJsonRPCRequest{
 				Method:  method,
 				JsonRPC: "2.0",
@@ -130,16 +167,18 @@ func (c *Client) readMessages() {
 }
 
 func (c *Client) writeMessages() {
-	for request := range c.outgoing {
-		encoded, err := json.Marshal(request)
-		if err != nil {
-			log.Fatal("Encode Error", err)
-		}
-		err = c.connection.WriteMessage(websocket.TextMessage, encoded)
-		if err != nil {
-			log.Println("write error:", err)
-			c.isConnected = false
+	for {
+		select {
+		case <-c.ctx.Done():
 			return
+		case message := <-c.outgoing:
+			encoded, _ := json.Marshal(message)
+			err := c.connection.WriteMessage(websocket.TextMessage, encoded)
+			if err != nil {
+				// Handle error (e.g., log it, trigger reconnection)
+				fmt.Println("Error writing message:", err)
+				return
+			}
 		}
 	}
 }
@@ -183,11 +222,6 @@ func (c *Client) Notify(method string, params map[string]interface{}) {
 	c.outgoing <- request
 }
 
-func (c *Client) Close() {
-	c.connection.Close()
-	close(c.outgoing)
-}
-
 func (c *Client) Upload(filename string, startPrint bool) {
 	u, err := url.Parse(c.Url)
 	if err != nil {
@@ -214,7 +248,23 @@ func (c *Client) Upload(filename string, startPrint bool) {
 	}
 }
 
-func (c *Client) Disconnect() {
-	c.closing = true
-	c.connection.Close()
+func (c *Client) emitConnected() {
+	req := IncomingJsonRPCRequest{JsonRPC: "2.0", Method: "_client_connected", Params: []interface{}{}}
+	c.Incoming <- req
+}
+
+func (c *Client) emitDisconnected() {
+	req := IncomingJsonRPCRequest{JsonRPC: "2.0", Method: "_client_disconnected", Params: []interface{}{}}
+	c.Incoming <- req
+}
+
+func (c *Client) Reconnect() {
+	timeout := 1
+	for i := 1; i <= 10; i++ {
+		if err := c.Start(); err == nil {
+			break
+		}
+		time.Sleep(time.Duration(timeout * 1e9))
+		timeout = timeout * 2
+	}
 }

@@ -2,6 +2,8 @@ package ui
 
 import (
 	"github.com/MapleLeafMakers/tview"
+	"github.com/gdamore/tcell/v2"
+	"log"
 	"sort"
 	"strconv"
 	"strings"
@@ -28,13 +30,14 @@ func (t TemperaturePanelContent) GetCell(row, column int) *tview.TableCell {
 	switch column {
 	case 0:
 		icon := getIcon(t.sensors[row].Type)
-		return tview.NewTableCell(" " + icon)
+		return tview.NewTableCell(" " + icon).SetSelectable(false)
 	case 1:
-		return tview.NewTableCell(t.sensors[row].DisplayName).SetExpansion(1)
+		return tview.NewTableCell(t.sensors[row].DisplayName).SetExpansion(1).SetSelectable(false)
 	case 2:
 		s := t.tui.State[t.sensors[row].StatusKey]
 		sensor := s
-		return tview.NewTableCell(strconv.FormatFloat(sensor["temperature"].(float64), 'f', 1, 64) + "°C").SetAlign(tview.AlignRight)
+		selectable := t.sensors[row].Type == "heater_bed" || t.sensors[row].Type == "heater_generic" || t.sensors[row].Type == "extruder"
+		return tview.NewTableCell(strconv.FormatFloat(sensor["temperature"].(float64), 'f', 1, 64) + "°C").SetAlign(tview.AlignRight).SetSelectable(selectable)
 	case 3:
 		s := t.tui.State[t.sensors[row].StatusKey]
 		sensor := s
@@ -45,9 +48,9 @@ func (t TemperaturePanelContent) GetCell(row, column int) *tview.TableCell {
 			if okActivity {
 				activityIcon = getHeaterActivityIcon(activity)
 			}
-			return tview.NewTableCell(strconv.Itoa(int(target.(float64))) + " " + activityIcon).SetAlign(tview.AlignRight)
+			return tview.NewTableCell(strconv.Itoa(int(target.(float64))) + " " + activityIcon).SetAlign(tview.AlignRight).SetSelectable(false)
 		} else {
-			return tview.NewTableCell("")
+			return tview.NewTableCell("").SetSelectable(false)
 		}
 	}
 	return nil
@@ -68,22 +71,32 @@ func (t TemperaturePanelContent) GetColumnCount() int {
 }
 
 func NewTemperaturePanel(tui *TUI) TemperaturePanelContent {
-	sensors := getSensors(tui.State["heaters"])
+	sensors := make([]TempSensor, 0, 20)
 	content := TemperaturePanelContent{
 		tui:       tui,
 		sensors:   sensors,
 		container: tview.NewFlex().SetDirection(tview.FlexRow),
 	}
-	table := tview.NewTable()
+	table := tview.NewTable().SetSelectable(true, true)
+	table.SetSelectedStyle(tcell.StyleDefault.Foreground(AppConfig.Theme.PrimaryTextColor.Color()).Background(AppConfig.Theme.BackgroundColor.Color()))
 
+	table.SetFocusFunc(func() {
+		log.Println("FocusTable")
+		table.SetSelectedStyle(tcell.Style{})
+	})
+	table.SetBlurFunc(func() {
+		log.Println("Blurtable")
+		table.SetSelectedStyle(tcell.StyleDefault.Foreground(AppConfig.Theme.PrimaryTextColor.Color()).Background(AppConfig.Theme.BackgroundColor.Color()))
+	})
 	content.table = table
 	table.SetContent(content)
-	content.container.AddItem(table, 0, 1, false)
+	content.container.AddItem(table, 0, 1, true)
 	content.container.SetBorder(true).SetTitle("[T[]emperatures")
 	return content
 }
 
-func getSensors(state map[string]interface{}) []TempSensor {
+func (t *TemperaturePanelContent) loadSensors() {
+	state := t.tui.State["heaters"]
 	sensors_ := state["available_sensors"].([]interface{})
 	sensors := make([]string, len(sensors_))
 	for i, s := range sensors_ {
@@ -108,7 +121,8 @@ func getSensors(state map[string]interface{}) []TempSensor {
 			Type:        sType,
 		}
 	}
-	return results
+	t.sensors = results
+	t.table.SetContent(t)
 }
 
 func toDisplayName(key string) string {

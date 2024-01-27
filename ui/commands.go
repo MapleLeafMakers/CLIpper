@@ -3,7 +3,9 @@ package ui
 import (
 	"clipper/ui/cmdinput"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"net/url"
 	"strings"
 )
 
@@ -78,6 +80,10 @@ type Command_Quit struct{}
 
 func (c Command_Quit) Call(ctx cmdinput.CommandContext) error {
 	tui, _ := ctx["tui"].(*TUI)
+	err := tui.RpcClient.Stop(false)
+	if err != nil {
+		panic(err)
+	}
 	tui.App.Stop()
 	return nil
 }
@@ -183,10 +189,42 @@ type Command_Disconnect struct{}
 
 func (c Command_Disconnect) Call(ctx cmdinput.CommandContext) error {
 	tui, _ := ctx["tui"].(*TUI)
-	tui.RpcClient.Disconnect()
+	tui.RpcClient.Stop(true)
 	return nil
 }
 
 func (c Command_Disconnect) GetCompleter(ctx cmdinput.CommandContext) cmdinput.TokenCompleter {
 	return nil
+}
+
+// /connect
+
+type Command_Connect struct{}
+
+func (c Command_Connect) Call(ctx cmdinput.CommandContext) error {
+	tui, _ := ctx["tui"].(*TUI)
+	if tui.RpcClient.IsConnected {
+		return errors.New("Already connected.")
+	} else {
+		raw := ctx["url"].(string)
+		if !strings.Contains("/", strings.ToLower(raw)) {
+			raw = "ws://" + raw + "/websocket"
+		}
+		server_url, err := url.Parse(raw)
+		if err != nil {
+			panic(err)
+		}
+		tui.App.QueueUpdateDraw(func() {
+			tui.Output.WriteResponse(fmt.Sprintf("Connecting to %s", server_url.String()))
+		})
+		tui.RpcClient.Url = server_url.String()
+		if err := tui.RpcClient.Start(); err != nil {
+			return errors.New(fmt.Sprintf("Failed to connect: %v", err))
+		}
+	}
+	return nil
+}
+
+func (c Command_Connect) GetCompleter(ctx cmdinput.CommandContext) cmdinput.TokenCompleter {
+	return cmdinput.AnythingCompleter{"url"}
 }

@@ -30,8 +30,6 @@ func NewToolheadPanel(tui *TUI) ToolheadPanelContent {
 	content.table.SetContent(content)
 	content.container.AddItem(content.table, 0, 1, false)
 	content.container.SetBorder(true).SetTitle("M[o[]tion")
-	spdInput := tview.NewInputField().SetLabel(" Speed: ")
-	content.container.AddItem(spdInput, 1, 0, false)
 	return content
 }
 

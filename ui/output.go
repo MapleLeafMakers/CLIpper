@@ -22,21 +22,33 @@ type LogContent struct {
 	tview.TableContentReadOnly
 	entries []LogEntry
 	table   *tview.Table
+	tui     *TUI
+}
+
+func (l *LogContent) Write(logEntry LogEntry) {
+	l.entries = append(l.entries, logEntry)
+}
+
+func splitToLogEntries(message string, base LogEntry) []LogEntry {
+	lines := cmdinput.WordWrap(cmdinput.Escape(message), 999) //arbitrary number to force it to only split on actual linebreaks for now
+	entries := make([]LogEntry, 0, len(lines))
+	for _, line := range lines {
+		e := base
+		e.Message = line
+		entries = append(entries, e)
+	}
+	return entries
 }
 
 func (l *LogContent) WriteResponse(message string) {
-	lines := cmdinput.WordWrap(cmdinput.Escape(message), 999) //arbitrary number to force it to only split on actual linebreaks for now
-	for _, line := range lines {
-		l.entries = append(l.entries, LogEntry{MsgTypeResponse, gostradamus.Now(), line})
-	}
+
+	l.entries = append(l.entries, splitToLogEntries(message, LogEntry{MsgTypeResponse, gostradamus.Now(), ""})...)
 	l.table.ScrollToEnd()
+
 }
 
 func (l *LogContent) WriteCommand(message string) {
-	lines := cmdinput.WordWrap(cmdinput.Escape(message), 999) //arbitrary number to force it to only split on actual linebreaks for now
-	for _, line := range lines {
-		l.entries = append(l.entries, LogEntry{MsgTypeCommand, gostradamus.Now(), line})
-	}
+	l.entries = append(l.entries, splitToLogEntries(message, LogEntry{MsgTypeCommand, gostradamus.Now(), ""})...)
 	l.table.ScrollToEnd()
 }
 

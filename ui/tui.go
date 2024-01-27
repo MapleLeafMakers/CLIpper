@@ -21,7 +21,7 @@ type TUI struct {
 	RpcClient         *jsonrpcclient.Client
 	TabCompleter      cmdinput.TabCompleter
 	State             map[string]map[string]interface{}
-	HostHeader        *tview.TextView
+	HostHeader        *tview.Table
 	TemperaturesPanel *TemperaturePanelContent
 	ToolheadPanel     *ToolheadPanelContent
 	hostname          string
@@ -70,9 +70,12 @@ func NewTUI(rpcClient *jsonrpcclient.Client) *TUI {
 		}
 		return nil // never happens
 	})
+	tui.buildLeftPanel()
 	tui.SwitchFocus(tui.Input)
 	tui.UpdateTheme()
-	go tui.initialize()
+
+	go tui.handleIncoming()
+	go tui.connectOnStartup()
 	return tui
 }
 
@@ -96,6 +99,7 @@ func (tui *TUI) buildInput() {
 	tui.TabCompleter.RegisterCommand("/estop", Command_EStop{})
 	tui.TabCompleter.RegisterCommand("/print", Command_Print{})
 	tui.TabCompleter.RegisterCommand("/disconnect", Command_Disconnect{})
+	tui.TabCompleter.RegisterCommand("/connect", Command_Connect{})
 
 	tui.Input.SetAutocompleteFunc(func(currentText string, cursorPos int) (entries []string, menuOffset int) {
 		ctx := cmdinput.CommandContext{
@@ -148,36 +152,29 @@ func (tui *TUI) buildInput() {
 func (tui *TUI) buildLeftPanel() {
 	flex := tview.NewFlex().SetDirection(tview.FlexRow)
 	tui.LeftPanel = flex
-	tui.HostHeader = tview.NewTextView().SetTextAlign(tview.AlignCenter).SetTextColor(tcell.ColorYellow).SetText(tui.hostname)
-	tui.HostHeader.SetBackgroundColor(tcell.ColorDarkCyan)
+	tui.HostHeader = NewHostHeader(tui)
 	tui.Root.AddItem(flex, 0, 0, 1, 1, 0, 0, true)
 	flex.AddItem(tui.HostHeader, 1, 1, false)
 
 	tempPanel := NewTemperaturePanel(tui)
 	tui.TemperaturesPanel = &tempPanel
-	flex.AddItem(tempPanel.container, len(tempPanel.sensors)+2, 0, false)
 
 	toolheadPanel := NewToolheadPanel(tui)
 	tui.ToolheadPanel = &toolheadPanel
-	flex.AddItem(toolheadPanel.container, 6, 0, false)
 
 	tui.LeftPanelSpacer = tview.NewBox()
 	flex.AddItem(tui.LeftPanelSpacer, 0, 1, false)
-
 }
 
 func (tui *TUI) initialize() {
+	log.Println("initializing")
 	wg := new(sync.WaitGroup)
-	go tui.handleIncoming()
 	wg.Add(2)
 	go tui.loadPrinterInfo(wg)
 	go tui.subscribe(wg)
-	wg.Wait()
-	tui.App.QueueUpdateDraw(func() {
-		tui.buildLeftPanel()
-	})
 	go tui.loadGcodeHelp()
-
+	log.Println("Waiting for subscribe")
+	wg.Wait()
 }
 
 func (tui *TUI) buildOutput(numLines int) {
@@ -199,6 +196,7 @@ func (tui *TUI) buildOutput(numLines int) {
 	tui.Output = &LogContent{
 		table:   output,
 		entries: lines,
+		tui:     tui,
 	}
 	output.SetContent(tui.Output)
 	output.ScrollToEnd()
@@ -284,12 +282,14 @@ func (tui *TUI) subscribe(wg *sync.WaitGroup) {
 	for _, key := range objList {
 		subs[key] = nil
 	}
+	log.Println("calling printer.objects.subscribe")
 	resp, err := tui.RpcClient.Call("printer.objects.subscribe", map[string]interface{}{
 		"objects": subs,
 	})
 	if err != nil {
 		panic(err)
 	}
+	log.Println("got a response")
 	asMap, _ := resp.(map[string]interface{})
 	objectsAsMap, _ := asMap["status"].(map[string]interface{})
 	state := make(map[string]map[string]interface{}, len(objectsAsMap))
@@ -297,6 +297,10 @@ func (tui *TUI) subscribe(wg *sync.WaitGroup) {
 		state[k] = v.(map[string]interface{})
 	}
 	tui.State = state
+	log.Println("Queuing initServerUI")
+	tui.App.QueueUpdateDraw(func() {
+		tui.initializeServerUI()
+	})
 }
 
 func (tui *TUI) UpdateState(statusChanges map[string]map[string]interface{}) {
@@ -322,11 +326,25 @@ func toStatusMap(stat map[string]interface{}) (map[string]map[string]interface{}
 }
 
 func (tui *TUI) handleIncoming() {
-
+	log.Println("handleIncoming")
 	for {
-
 		incoming := <-tui.RpcClient.Incoming
 		switch incoming.Method {
+		case "_client_connected":
+			// rpcclient connected to server, re-init everything
+			// show some indication of connection status
+			tui.App.QueueUpdateDraw(func() {
+				tui.Output.WriteResponse("Connected to " + tui.RpcClient.Url)
+			})
+			tui.initialize()
+
+		case "_client_disconnected":
+			// rpcclient disconnected (may have been intentional) from server, stop doing stuff
+			// show some indication of connection status
+			tui.App.QueueUpdateDraw(func() {
+				tui.removeServerUI()
+				tui.Output.WriteResponse("Disconnected.")
+			})
 		case "notify_status_update":
 			status := incoming.Params[0].(map[string]interface{})
 			statusMap, _ := toStatusMap(status)
@@ -334,6 +352,7 @@ func (tui *TUI) handleIncoming() {
 				tui.UpdateState(statusMap)
 				if AppConfig.LogIncoming {
 					out, _ := json.MarshalIndent(status, "", " ")
+					log.Println(string(out))
 					tui.Output.WriteResponse(string(out))
 				}
 			})
@@ -380,6 +399,30 @@ func (tui *TUI) ExecuteGcode(gcode string) {
 
 func (tui *TUI) SwitchFocus(widget tview.Primitive) {
 	tui.App.SetFocus(widget)
+}
+
+func (tui *TUI) connectOnStartup() {
+	if tui.RpcClient.Url != "" && !tui.RpcClient.IsConnected {
+		if err := tui.RpcClient.Start(); err != nil {
+			log.Fatalf("Failed to connect: %v", err)
+		}
+	} else if tui.RpcClient.IsConnected {
+		tui.initialize()
+	}
+}
+
+func (tui *TUI) initializeServerUI() {
+	log.Println("Initializing Server UI")
+	tui.TemperaturesPanel.loadSensors()
+	tui.LeftPanel.RemoveItem(tui.LeftPanelSpacer)
+	tui.LeftPanel.AddItem(tui.TemperaturesPanel.container, len(tui.TemperaturesPanel.sensors)+2, 0, false)
+	tui.LeftPanel.AddItem(tui.ToolheadPanel.container, 5, 0, false)
+	tui.LeftPanel.AddItem(tui.LeftPanelSpacer, 0, 1, false)
+}
+
+func (tui *TUI) removeServerUI() {
+	tui.LeftPanel.RemoveItem(tui.TemperaturesPanel.container)
+	tui.LeftPanel.RemoveItem(tui.ToolheadPanel.container)
 }
 
 func dumpToJson(obj any) string {
