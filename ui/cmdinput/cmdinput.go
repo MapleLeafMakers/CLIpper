@@ -3,7 +3,6 @@ package cmdinput
 import (
 	"github.com/MapleLeafMakers/tview"
 	"github.com/gdamore/tcell/v2"
-	"log"
 	"strconv"
 	"strings"
 	"sync"
@@ -141,7 +140,7 @@ func NewInputField() *InputField {
 	i.textArea.SetTextStyle(tcell.StyleDefault.Background(tview.Styles.ContrastBackgroundColor).Foreground(tview.Styles.PrimaryTextColor))
 	i.textArea.SetPlaceholderStyle(tcell.StyleDefault.Background(tview.Styles.ContrastBackgroundColor).Foreground(tview.Styles.ContrastSecondaryTextColor))
 	i.autocompleteStyles.main = tcell.StyleDefault.Foreground(tview.Styles.PrimitiveBackgroundColor)
-	i.autocompleteStyles.selected = tcell.StyleDefault.Background(tview.Styles.PrimaryTextColor).Foreground(tcell.ColorDarkMagenta)
+	i.autocompleteStyles.selected = tcell.StyleDefault.Background(tview.Styles.PrimaryTextColor).Foreground(tview.Styles.PrimitiveBackgroundColor)
 	i.autocompleteStyles.background = tview.Styles.MoreContrastBackgroundColor
 
 	commandHistory := make([]string, 0, 200)
@@ -425,7 +424,7 @@ func (i *InputField) Focus(delegate func(p tview.Primitive)) {
 		i.finished(-1)
 		return
 	}
-
+	i.textArea.Focus(delegate)
 	i.Box.Focus(delegate)
 }
 
@@ -587,11 +586,11 @@ func (i *InputField) InputHandler() func(event *tcell.EventKey, setFocus func(p 
 			i.autocompleteListMutex.Lock()
 			i.HistoryDown()
 			skipAutocomplete = true
-			log.Printf("%+v, %#q", i.commandHistoryIndex, i.commandHistory)
+
 		case tcell.KeyUp:
 			i.HistoryUp()
 			skipAutocomplete = true
-			log.Printf("%+v, %#q", i.commandHistoryIndex, i.commandHistory)
+
 		case tcell.KeyEnter, tcell.KeyEscape, tcell.KeyTab, tcell.KeyBacktab:
 			finish(key)
 		case tcell.KeyRune:
@@ -717,8 +716,15 @@ func (i *InputField) NewCommand() {
 }
 
 func (i *InputField) updateCurrentHistoryEntry() {
-	log.Println("Updating current History")
 	if i.commandHistoryIndex == len(i.commandHistory)-1 {
 		i.commandHistory[i.commandHistoryIndex] = i.GetText()
+	}
+}
+
+func (i *InputField) GetFocusState() map[string]bool {
+
+	return map[string]bool{
+		"Input":          i.Box.HasFocus(),
+		"Input.textArea": i.textArea.HasFocus(),
 	}
 }

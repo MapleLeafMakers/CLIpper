@@ -2,7 +2,6 @@ package ui
 
 import (
 	"github.com/MapleLeafMakers/tview"
-	"github.com/gdamore/tcell/v2"
 	"sort"
 	"strconv"
 	"strings"
@@ -21,7 +20,6 @@ type TemperaturePanelContent struct {
 	tui       *TUI
 	sensors   []TempSensor
 	table     *tview.Table
-	Header    *tview.TextView
 	container *tview.Flex
 }
 
@@ -81,7 +79,7 @@ func NewTemperaturePanel(tui *TUI) TemperaturePanelContent {
 	content.table = table
 	table.SetContent(content)
 	content.container.AddItem(table, 0, 1, false)
-	content.container.SetBorder(true).SetTitle("Temperatures").SetTitleColor(tcell.ColorLightYellow)
+	content.container.SetBorder(true).SetTitle("[T[]emperatures")
 	return content
 }
 

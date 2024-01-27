@@ -5,10 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/MapleLeafMakers/tview"
 	"github.com/gdamore/tcell/v2"
 	"github.com/kirsle/configdir"
-	"log"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -19,8 +17,30 @@ import (
 
 type ConfigColor string
 
+func (c ConfigColor) Color() tcell.Color {
+	return tcell.GetColor(string(c))
+}
+
 type ThemeConfig struct {
-	BorderColor ConfigColor
+	BackgroundColor    ConfigColor `json:"backgroundColor"`
+	BorderColor        ConfigColor `json:"borderColor"`
+	TitleColor         ConfigColor `json:"titleColor"`
+	GraphicsColor      ConfigColor `json:"graphicsColor"`
+	PrimaryTextColor   ConfigColor `json:"primaryTextColor"`
+	SecondaryTextColor ConfigColor `json:"secondaryTextColor"`
+	TertiaryTextColor  ConfigColor `json:"tertiaryTextColor"`
+
+	ConsoleBackgroundColor          ConfigColor `json:"consoleBackgroundColor"`
+	ConsoleTextColor                ConfigColor `json:"consoleTextColor"`
+	ConsoleTimestampBackgroundColor ConfigColor `json:"consoleTimestampBackgroundColor"`
+	ConsoleTimestampTextColor       ConfigColor `json:"consoleTimestampTextColor"`
+
+	InputTextColor              ConfigColor `json:"inputTextColor"`
+	InputBackgroundColor        ConfigColor `json:"inputBackgroundColor"`
+	InputPromptColor            ConfigColor `json:"inputPromptColor"`
+	InputPlaceholderColor       ConfigColor `json:"inputPlaceholderColor"`
+	AutocompleteBackgroundColor ConfigColor `json:"autocompleteMenuBackgroundColor"`
+	AutocompleteTextColor       ConfigColor `json:"autocompleteTextColor"`
 }
 
 type Config struct {
@@ -33,7 +53,25 @@ var DefaultConfig = &Config{
 	LogIncoming:     false,
 	TimestampFormat: "hh:mm:ss",
 	Theme: ThemeConfig{
-		BorderColor: "#404040",
+		BackgroundColor:    "",
+		BorderColor:        "white",
+		TitleColor:         "white",
+		GraphicsColor:      "white",
+		PrimaryTextColor:   "white",
+		SecondaryTextColor: "yellow",
+		TertiaryTextColor:  "green",
+
+		ConsoleBackgroundColor:          "default",
+		ConsoleTextColor:                "white",
+		ConsoleTimestampBackgroundColor: "darkslategray",
+		ConsoleTimestampTextColor:       "white",
+
+		InputTextColor:              "white",
+		InputBackgroundColor:        "darkblue",
+		InputPromptColor:            "gold",
+		InputPlaceholderColor:       "darkslategray",
+		AutocompleteBackgroundColor: "white",
+		AutocompleteTextColor:       "darkblue",
 	},
 }
 
@@ -51,7 +89,6 @@ func (c *Config) Load() error {
 	}
 	cfgBytes, err := os.ReadFile(configFile)
 	err = json.Unmarshal(cfgBytes, c)
-	tview.Styles.BorderColor = tcell.GetColor(string(AppConfig.Theme.BorderColor))
 	return err
 }
 
@@ -62,7 +99,6 @@ func (c *Config) Save() error {
 		return err
 	}
 	configFile := filepath.Join(configPath, "config.json")
-	log.Printf("Saving %#v", c)
 	cfgBytes, _ := json.MarshalIndent(*c, "", "  ")
 	err = os.WriteFile(configFile, cfgBytes, 0644)
 	return err
@@ -103,9 +139,9 @@ func (c *Config) getField(path string) (reflect.Value, error) {
 	return currentVal, nil
 }
 
-func (c *Config) Set(path string, value string) error {
-	updateTheme := strings.HasPrefix(path, "theme.")
+func (c *Config) Set(path string, value interface{}) error {
 	var err error
+	var ok bool
 	var field reflect.Value
 	var val interface{}
 	field, err = c.getField(path)
@@ -113,25 +149,31 @@ func (c *Config) Set(path string, value string) error {
 	case reflect.String:
 		switch field.Type() {
 		case reflect.TypeOf(ConfigColor("")):
-			val = ConfigColor(value)
+			val = ConfigColor(value.(string))
 		default:
 			val = value
 		}
 	case reflect.Bool:
-		val, err = strconv.ParseBool(value)
+		val, ok = value.(bool)
+		if !ok {
+			val, err = strconv.ParseBool(value.(string))
+		}
+
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		val, err = strconv.ParseInt(value, 10, 64)
+		val, ok = value.(int)
+		if !ok {
+			val, err = strconv.ParseInt(value.(string), 10, 64)
+		}
 	case reflect.Float32, reflect.Float64:
-		val, err = strconv.ParseFloat(value, 64)
+		val, ok = value.(float64)
+		if !ok {
+			val, err = strconv.ParseFloat(value.(string), 64)
+		}
 	}
 	if err != nil {
 		return err
 	}
 	field.Set(reflect.ValueOf(val))
-	if updateTheme {
-		log.Println("Updating Theme")
-		tview.Styles.BorderColor = tcell.GetColor(string(AppConfig.Theme.BorderColor))
-	}
 	return nil
 }
 
@@ -171,7 +213,6 @@ func joinPrefix(prefix, name string) string {
 }
 
 func NewSettingsCompleter() cmdinput.StaticTokenCompleter {
-	log.Println("Building settings completer")
 	keys := AppConfig.GetKeys()
 	reg := make(map[string]cmdinput.TokenCompleter, len(keys))
 	for _, key := range keys {
@@ -193,6 +234,5 @@ func NewSettingsCompleter() cmdinput.StaticTokenCompleter {
 		ContextKey: "setting",
 		Registry:   reg,
 	}
-	log.Println("Built settings completer")
 	return completer
 }

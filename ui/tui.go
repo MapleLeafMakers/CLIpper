@@ -8,53 +8,10 @@ import (
 	"github.com/MapleLeafMakers/tview"
 	"github.com/bykof/gostradamus"
 	"github.com/gdamore/tcell/v2"
+	"log"
 	"sync"
 	"time"
 )
-
-type LogEntry struct {
-	Timestamp gostradamus.DateTime
-	Message   string
-}
-
-type LogContent struct {
-	tview.TableContentReadOnly
-	entries []LogEntry
-	table   *tview.Table
-}
-
-func (l *LogContent) Write(message string) {
-	lines := cmdinput.WordWrap(cmdinput.Escape(message), 999) //arbitrary number to force it to only split on actual linebreaks for now
-	for _, line := range lines {
-		l.entries = append(l.entries, LogEntry{gostradamus.Now(), line})
-	}
-	l.table.ScrollToEnd()
-}
-
-func (l LogContent) GetCell(row, column int) *tview.TableCell {
-
-	switch column {
-	case 0:
-		var txt string
-		if l.entries[row].Timestamp.Time().IsZero() {
-			txt = ""
-		} else {
-			txt = l.entries[row].Timestamp.Format(" " + AppConfig.TimestampFormat)
-		}
-		return tview.NewTableCell(txt).SetBackgroundColor(tcell.NewRGBColor(64, 64, 64))
-	case 1:
-		return tview.NewTableCell(" " + l.entries[row].Message)
-	}
-	return nil
-}
-
-func (l LogContent) GetRowCount() int {
-	return len(l.entries)
-}
-
-func (l LogContent) GetColumnCount() int {
-	return 2
-}
 
 type TUI struct {
 	App               *tview.Application
@@ -68,6 +25,11 @@ type TUI struct {
 	TemperaturesPanel *TemperaturePanelContent
 	ToolheadPanel     *ToolheadPanelContent
 	hostname          string
+	LeftPanel         *tview.Flex
+	LeftPanelSpacer   *tview.Box
+
+	bellPending    bool // should a bell be rung on the next Draw
+	focusedControl interface{}
 }
 
 func NewTUI(rpcClient *jsonrpcclient.Client) *TUI {
@@ -80,9 +42,24 @@ func NewTUI(rpcClient *jsonrpcclient.Client) *TUI {
 	tui.buildOutput(100)
 	tui.buildWindow()
 	tui.App = tview.NewApplication().SetRoot(tui.Root, true).EnableMouse(true)
-
+	tui.App.SetBeforeDrawFunc(func(screen tcell.Screen) bool {
+		if tui.bellPending {
+			tui.bellPending = false
+			err := screen.Beep()
+			if err != nil {
+				log.Println(err)
+			}
+		}
+		return false
+	})
 	tui.App.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		switch event.Key() {
+		case tcell.KeyCtrlT:
+			tui.SwitchFocus(tui.TemperaturesPanel.container)
+		case tcell.KeyCtrlO:
+			tui.SwitchFocus(tui.ToolheadPanel.container)
+		case tcell.KeyCtrlC:
+			tui.SwitchFocus(tui.Input)
 		case tcell.KeyPgUp, tcell.KeyPgDn:
 			tui.Output.table.InputHandler()(event, func(p tview.Primitive) {})
 			return nil
@@ -93,14 +70,22 @@ func NewTUI(rpcClient *jsonrpcclient.Client) *TUI {
 		}
 		return nil // never happens
 	})
-
+	tui.SwitchFocus(tui.Input)
+	tui.UpdateTheme()
 	go tui.initialize()
 	return tui
 }
 
+func (tui *TUI) Bell() {
+	tui.bellPending = true
+}
+
 func (tui *TUI) buildInput() {
 	//tui.Input = tview.NewInputField()
-	tui.Input = cmdinput.NewInputField().SetPlaceholder("Enter GCODE Commands or / commands").SetLabel("> ").SetLabelStyle(tcell.StyleDefault.Background(tcell.ColorBlue).Foreground(tcell.ColorWhite).Bold(true))
+	tui.Input = cmdinput.NewInputField().
+		SetPlaceholder("Enter GCODE Commands or / commands").
+		SetLabel("> ")
+
 	tui.TabCompleter = cmdinput.NewTabCompleter()
 	tui.TabCompleter.RegisterCommand("/set", Command_Set{})
 	tui.TabCompleter.RegisterCommand("/settings", Command_Settings{})
@@ -110,6 +95,7 @@ func (tui *TUI) buildInput() {
 	tui.TabCompleter.RegisterCommand("/firmware_restart", Command_FirmwareRestart{})
 	tui.TabCompleter.RegisterCommand("/estop", Command_EStop{})
 	tui.TabCompleter.RegisterCommand("/print", Command_Print{})
+	tui.TabCompleter.RegisterCommand("/disconnect", Command_Disconnect{})
 
 	tui.Input.SetAutocompleteFunc(func(currentText string, cursorPos int) (entries []string, menuOffset int) {
 		ctx := cmdinput.CommandContext{
@@ -138,8 +124,10 @@ func (tui *TUI) buildInput() {
 				cmd, ok := ctx["cmd"]
 				// ew
 				if ok {
+					tui.Output.WriteCommand(ctx["raw"].(string))
 					cmd2, ok2 := cmd.(cmdinput.Command)
 					if ok2 {
+
 						go cmd2.Call(ctx)
 					}
 				} else {
@@ -150,7 +138,7 @@ func (tui *TUI) buildInput() {
 			} else if err.Error() == "NoInput" {
 
 			} else {
-				panic(err)
+				tui.Output.WriteResponse(err.Error())
 			}
 		default:
 		}
@@ -159,16 +147,23 @@ func (tui *TUI) buildInput() {
 
 func (tui *TUI) buildLeftPanel() {
 	flex := tview.NewFlex().SetDirection(tview.FlexRow)
+	tui.LeftPanel = flex
 	tui.HostHeader = tview.NewTextView().SetTextAlign(tview.AlignCenter).SetTextColor(tcell.ColorYellow).SetText(tui.hostname)
 	tui.HostHeader.SetBackgroundColor(tcell.ColorDarkCyan)
 	tui.Root.AddItem(flex, 0, 0, 1, 1, 0, 0, true)
 	flex.AddItem(tui.HostHeader, 1, 1, false)
+
 	tempPanel := NewTemperaturePanel(tui)
 	tui.TemperaturesPanel = &tempPanel
 	flex.AddItem(tempPanel.container, len(tempPanel.sensors)+2, 0, false)
+
 	toolheadPanel := NewToolheadPanel(tui)
 	tui.ToolheadPanel = &toolheadPanel
-	flex.AddItem(toolheadPanel.container, 5, 0, true)
+	flex.AddItem(toolheadPanel.container, 6, 0, false)
+
+	tui.LeftPanelSpacer = tview.NewBox()
+	flex.AddItem(tui.LeftPanelSpacer, 0, 1, false)
+
 }
 
 func (tui *TUI) initialize() {
@@ -184,6 +179,7 @@ func (tui *TUI) initialize() {
 	go tui.loadGcodeHelp()
 
 }
+
 func (tui *TUI) buildOutput(numLines int) {
 
 	output := tview.NewTable()
@@ -191,14 +187,14 @@ func (tui *TUI) buildOutput(numLines int) {
 	lines := make([]LogEntry, numLines)
 	i := 0
 	for i = 0; i < numLines-6; i++ {
-		lines[i] = LogEntry{ts, ""}
+		lines[i] = LogEntry{MsgTypeInternal, ts, ""}
 	}
-	lines[i+0] = LogEntry{gostradamus.Now(), "[yellow]   ________    ____                     "}
-	lines[i+1] = LogEntry{gostradamus.Now(), "[yellow]  / ____/ /   /  _/___  ____  ___  _____"}
-	lines[i+2] = LogEntry{gostradamus.Now(), "[yellow] / /   / /    / // __ \\/ __ \\/ _ \\/ ___/"}
-	lines[i+3] = LogEntry{gostradamus.Now(), "[yellow]/ /___/ /____/ // /_/ / /_/ /  __/ /    "}
-	lines[i+4] = LogEntry{gostradamus.Now(), "[yellow]\\____/_____/___/ .___/ .___/\\___/_/     "}
-	lines[i+5] = LogEntry{gostradamus.Now(), "[yellow]              /_/   /_/                 "}
+	lines[i+0] = LogEntry{MsgTypeInternal, gostradamus.Now(), "[yellow]   ________    ____                     "}
+	lines[i+1] = LogEntry{MsgTypeInternal, gostradamus.Now(), "[yellow]  / ____/ /   /  _/___  ____  ___  _____"}
+	lines[i+2] = LogEntry{MsgTypeInternal, gostradamus.Now(), "[yellow] / /   / /    / // __ \\/ __ \\/ _ \\/ ___/"}
+	lines[i+3] = LogEntry{MsgTypeInternal, gostradamus.Now(), "[yellow]/ /___/ /____/ // /_/ / /_/ /  __/ /    "}
+	lines[i+4] = LogEntry{MsgTypeInternal, gostradamus.Now(), "[yellow]\\____/_____/___/ .___/ .___/\\___/_/     "}
+	lines[i+5] = LogEntry{MsgTypeInternal, gostradamus.Now(), "[yellow]              /_/   /_/                 "}
 
 	tui.Output = &LogContent{
 		table:   output,
@@ -214,9 +210,8 @@ func (tui *TUI) buildWindow() {
 		SetRows(0, 1).
 		SetColumns(36, 0).
 		SetBorders(true).
-		AddItem(tui.Input, 1, 0, 1, 2, 0, 0, true).
+		AddItem(tui.Input, 1, 0, 1, 2, 0, 0, false).
 		AddItem(tui.Output.table, 0, 1, 1, 1, 0, 0, false)
-
 }
 
 func getObjectList(client *jsonrpcclient.Client) []string {
@@ -235,10 +230,51 @@ func getObjectList(client *jsonrpcclient.Client) []string {
 }
 
 func (tui *TUI) UpdateTheme() {
+	tview.Styles.PrimitiveBackgroundColor = AppConfig.Theme.BackgroundColor.Color()
+	tview.Styles.BorderColor = AppConfig.Theme.BorderColor.Color()
+	tview.Styles.PrimaryTextColor = AppConfig.Theme.PrimaryTextColor.Color()
+	tview.Styles.SecondaryTextColor = AppConfig.Theme.SecondaryTextColor.Color()
+	tview.Styles.GraphicsColor = AppConfig.Theme.GraphicsColor.Color()
+	tview.Styles.TitleColor = AppConfig.Theme.TitleColor.Color()
+
 	// update the colors of everything, since there doesn't seem to be a better way
-	tui.Root.SetBordersColor(tcell.GetColor(string(AppConfig.Theme.BorderColor)))
-	tui.ToolheadPanel.container.SetBorderColor(tcell.GetColor(string(AppConfig.Theme.BorderColor)))
-	tui.TemperaturesPanel.container.SetBorderColor(tcell.GetColor(string(AppConfig.Theme.BorderColor)))
+	if tui.Root != nil {
+		tui.Root.SetBackgroundColor(tview.Styles.PrimitiveBackgroundColor)
+		tui.Root.SetBordersColor(tview.Styles.BorderColor)
+	}
+
+	tui.Output.table.SetBackgroundColor(AppConfig.Theme.ConsoleBackgroundColor.Color())
+
+	tui.Input.SetLabelStyle(
+		tcell.StyleDefault.Background(AppConfig.Theme.InputBackgroundColor.Color()).
+			Foreground(AppConfig.Theme.InputPromptColor.Color()).Bold(true)).
+		SetFieldBackgroundColor(AppConfig.Theme.InputBackgroundColor.Color()).
+		SetFieldTextColor(AppConfig.Theme.InputTextColor.Color()).
+		SetAutocompleteStyles(
+			AppConfig.Theme.AutocompleteBackgroundColor.Color(),
+			tcell.StyleDefault.Foreground(AppConfig.Theme.AutocompleteTextColor.Color()),
+			tcell.StyleDefault.Foreground(AppConfig.Theme.AutocompleteBackgroundColor.Color()).Background(AppConfig.Theme.AutocompleteTextColor.Color())).
+		SetPlaceholderStyle(tcell.StyleDefault.Background(AppConfig.Theme.InputBackgroundColor.Color()).Foreground(AppConfig.Theme.InputPlaceholderColor.Color()))
+
+	if tui.LeftPanel != nil {
+		tui.LeftPanel.SetBackgroundColor(tview.Styles.PrimitiveBackgroundColor)
+		tui.LeftPanelSpacer.SetBackgroundColor(tview.Styles.PrimitiveBackgroundColor)
+
+		if tui.ToolheadPanel != nil {
+			tui.ToolheadPanel.container.SetBorderColor(tview.Styles.BorderColor)
+			tui.ToolheadPanel.container.SetBackgroundColor(tview.Styles.PrimitiveBackgroundColor)
+			tui.ToolheadPanel.table.SetBackgroundColor(tview.Styles.PrimitiveBackgroundColor)
+			tui.ToolheadPanel.container.SetTitleColor(tview.Styles.TitleColor)
+		}
+
+		if tui.TemperaturesPanel != nil {
+			tui.TemperaturesPanel.container.SetBorderColor(tview.Styles.BorderColor)
+			tui.TemperaturesPanel.table.SetBackgroundColor(tview.Styles.PrimitiveBackgroundColor)
+			tui.TemperaturesPanel.container.SetBackgroundColor(tview.Styles.PrimitiveBackgroundColor)
+			tui.TemperaturesPanel.container.SetTitleColor(tview.Styles.TitleColor)
+		}
+	}
+
 }
 
 func (tui *TUI) subscribe(wg *sync.WaitGroup) {
@@ -261,9 +297,6 @@ func (tui *TUI) subscribe(wg *sync.WaitGroup) {
 		state[k] = v.(map[string]interface{})
 	}
 	tui.State = state
-	tui.App.QueueUpdateDraw(func() {
-		//log.Println("Subbed", state)
-	})
 }
 
 func (tui *TUI) UpdateState(statusChanges map[string]map[string]interface{}) {
@@ -271,9 +304,6 @@ func (tui *TUI) UpdateState(statusChanges map[string]map[string]interface{}) {
 		for subKey, value := range objectStatus {
 			tui.State[key][subKey] = value
 			// TODO: Notify the relevant UI elements?
-		}
-		if key == "gcode_move" {
-			tui.ToolheadPanel.UpdatePositions()
 		}
 	}
 
@@ -304,14 +334,14 @@ func (tui *TUI) handleIncoming() {
 				tui.UpdateState(statusMap)
 				if AppConfig.LogIncoming {
 					out, _ := json.MarshalIndent(status, "", " ")
-					tui.Output.Write(string(out))
+					tui.Output.WriteResponse(string(out))
 				}
 			})
 
 		case "notify_gcode_response":
 			tui.App.QueueUpdateDraw(func() {
 				for _, line := range incoming.Params {
-					tui.Output.Write(line.(string))
+					tui.Output.WriteResponse(line.(string))
 				}
 			})
 		default:
@@ -342,6 +372,14 @@ func (tui *TUI) loadGcodeHelp() {
 			tui.TabCompleter.RegisterCommand(k, NewGcodeCommand(k, help.(string)))
 		}
 	})
+}
+
+func (tui *TUI) ExecuteGcode(gcode string) {
+	log.Println("Executing GCODE:\n" + gcode)
+}
+
+func (tui *TUI) SwitchFocus(widget tview.Primitive) {
+	tui.App.SetFocus(widget)
 }
 
 func dumpToJson(obj any) string {

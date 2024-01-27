@@ -108,7 +108,7 @@ func (t *TabCompleter) Parse(currentText string, ctx CommandContext) error {
 		match, _, next := currentCompleter.Match(token, ctx)
 		if !match {
 			// bail out, no completions match
-			break
+			return errors.New("No Match for " + token)
 		}
 		if next == nil {
 			// we're done
@@ -253,7 +253,7 @@ func NewColorTokenCompleter(contextKey string, nextCompleter TokenCompleter) Col
 
 func (c ColorTokenCompleter) Match(token string, ctx CommandContext) (bool, string, *TokenCompleter) {
 	color := tcell.GetColor(token)
-	if color == tcell.ColorDefault {
+	if color == tcell.ColorDefault && strings.ToLower(token) != "default" {
 		return false, "", nil
 	}
 	ctx[c.ContextKey] = token
@@ -262,7 +262,8 @@ func (c ColorTokenCompleter) Match(token string, ctx CommandContext) (bool, stri
 
 func (c ColorTokenCompleter) Complete(token string, ctx CommandContext) (results []string, match bool) {
 	lowerToken := strings.ToLower(token)
-	sortedKeys := make([]string, 0, len(tcell.ColorNames))
+	sortedKeys := make([]string, 0, len(tcell.ColorNames)+1)
+	sortedKeys = append(sortedKeys, "default")
 	for k, _ := range tcell.ColorNames {
 		sortedKeys = append(sortedKeys, k)
 	}

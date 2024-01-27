@@ -17,13 +17,13 @@ func (g GcodeCommand) Call(ctx cmdinput.CommandContext) error {
 	tui := ctx["tui"].(*TUI)
 
 	go tui.App.QueueUpdateDraw(func() {
-		tui.Output.Write(rawCommand)
+		tui.Output.WriteResponse(rawCommand)
 	})
 
 	_, err := tui.RpcClient.Call("printer.gcode.script", map[string]interface{}{"script": rawCommand})
 	if err != nil {
 		tui.App.QueueUpdateDraw(func() {
-			tui.Output.Write("Error: " + err.Error())
+			tui.Output.WriteResponse("Error: " + err.Error())
 		})
 	}
 	return nil
@@ -44,10 +44,10 @@ func (c Command_Set) Call(ctx cmdinput.CommandContext) error {
 	tui, _ := ctx["tui"].(*TUI)
 	key, _ := ctx["setting"].(string)
 	value := ctx["value"]
-	AppConfig.Set(key, value.(string))
-	tui.UpdateTheme()
-	tui.Output.Write(fmt.Sprintf("Set %s to %+v", key, value))
+	AppConfig.Set(key, value)
+	tui.Output.WriteResponse(fmt.Sprintf("Set %s to %+v", key, value))
 	AppConfig.Save()
+	tui.UpdateTheme()
 	return nil
 }
 
@@ -64,7 +64,7 @@ func (c Command_Settings) Call(ctx cmdinput.CommandContext) error {
 	if err != nil {
 		panic(err)
 	} else {
-		tui.Output.Write(string(str))
+		tui.Output.WriteResponse(string(str))
 	}
 	return nil
 }
@@ -87,6 +87,7 @@ func (c Command_Quit) GetCompleter(ctx cmdinput.CommandContext) cmdinput.TokenCo
 }
 
 // /rpc
+
 type Command_RPC struct{}
 
 func (c Command_RPC) Call(ctx cmdinput.CommandContext) error {
@@ -104,7 +105,7 @@ func (c Command_RPC) Call(ctx cmdinput.CommandContext) error {
 	}
 	resp, _ := tui.RpcClient.Call(ctx["method"].(string), payload)
 	tui.App.QueueUpdateDraw(func() {
-		tui.Output.Write(dumpToJson(resp))
+		tui.Output.WriteResponse(dumpToJson(resp))
 	})
 
 	return nil
@@ -174,4 +175,18 @@ func (c Command_Print) Call(ctx cmdinput.CommandContext) error {
 
 func (c Command_Print) GetCompleter(ctx cmdinput.CommandContext) cmdinput.TokenCompleter {
 	return cmdinput.NewFileTokenCompleter("file", nil)
+}
+
+// /disconnect
+
+type Command_Disconnect struct{}
+
+func (c Command_Disconnect) Call(ctx cmdinput.CommandContext) error {
+	tui, _ := ctx["tui"].(*TUI)
+	tui.RpcClient.Disconnect()
+	return nil
+}
+
+func (c Command_Disconnect) GetCompleter(ctx cmdinput.CommandContext) cmdinput.TokenCompleter {
+	return nil
 }

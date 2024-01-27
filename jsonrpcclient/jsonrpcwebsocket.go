@@ -26,6 +26,7 @@ type Client struct {
 	responseHandlers map[string]chan JsonRPCResponse
 	responseMutex    sync.Mutex
 	nextId           int
+	closing          bool
 }
 
 type JsonRPCRequest struct {
@@ -211,4 +212,9 @@ func (c *Client) Upload(filename string, startPrint bool) {
 	if err != nil {
 		panic(err)
 	}
+}
+
+func (c *Client) Disconnect() {
+	c.closing = true
+	c.connection.Close()
 }
