@@ -53,14 +53,14 @@ go mod download
 
 This can be as simple as:
 
-    ```shell
-    go build
-    ```
+```shell
+go build
+```
     
 You can also include version and git commit information in the build using:
     
-    ```shell
-    go build -v -ldflags="-X main.commit=$(git describe --always --long --dirty) -X main.version=v0.0.0"
-    ```
+```shell
+go build -v -ldflags="-X main.commit=$(git describe --always --long --dirty) -X main.version=v0.0.0"
+```
 
 © 2024 MapleLeafMakers
