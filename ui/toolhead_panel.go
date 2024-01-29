@@ -65,7 +65,7 @@ func (t ToolheadPanelContent) moveToolhead(axis string, dist float64) {
 func buildAxis(axis string, color tcell.Color) []*tview.TableCell {
 	cells := make([]*tview.TableCell, 0, 3)
 	cells = append(cells, tview.NewTableCell(" "+axis+":").SetTextColor(color))
-	cells = append(cells, tview.NewTableCell("?"))
+	cells = append(cells, tview.NewTableCell("?").SetTextColor(AppConfig.Theme.PrimaryTextColor.Color()))
 	cells = append(cells, tview.NewTableCell("").SetTextColor(AppConfig.Theme.TertiaryTextColor.Color()).SetAlign(tview.AlignRight).SetExpansion(1))
 	return cells
 }
