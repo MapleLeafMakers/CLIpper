@@ -1,12 +1,18 @@
 package ui
 
 import (
+	"bytes"
 	"clipper/ui/cmdinput"
 	"clipper/wsjsonrpc"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"mime/multipart"
+	"net/http"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -171,10 +177,27 @@ type Command_Print struct{}
 
 func (c Command_Print) Call(ctx cmdinput.CommandContext) error {
 
-	//file := ctx["file"].(string)
-	//tui, _ := ctx["tui"].(*TUI)
-	//tui.RpcClient.Upload(ctx["file"].(string), true)
-	return nil
+	filename := ctx["file"].(string)
+	tui, _ := ctx["tui"].(*TUI)
+	httpUrl := *tui.RpcClient.Url
+	httpUrl.Scheme = "http"
+	httpUrl.Path = "/server/files/upload"
+
+	file, _ := os.Open(filename)
+	defer file.Close()
+
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+	writer.WriteField("print", "true")
+	part, _ := writer.CreateFormFile("file", filepath.Base(file.Name()))
+	io.Copy(part, file)
+	writer.Close()
+
+	r, _ := http.NewRequest("POST", httpUrl.String(), body)
+	r.Header.Add("Content-Type", writer.FormDataContentType())
+	client := &http.Client{}
+	_, err := client.Do(r)
+	return err
 }
 
 func (c Command_Print) GetCompleter(ctx cmdinput.CommandContext) cmdinput.TokenCompleter {
