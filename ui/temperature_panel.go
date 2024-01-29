@@ -97,6 +97,7 @@ func NewTemperaturePanel(tui *TUI) TemperaturePanelContent {
 
 func (t *TemperaturePanelContent) loadSensors() {
 	state := t.tui.State["heaters"]
+	log.Printf("State: %#v", state)
 	sensors_ := state["available_sensors"].([]interface{})
 	sensors := make([]string, len(sensors_))
 	for i, s := range sensors_ {

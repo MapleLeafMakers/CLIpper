@@ -1,11 +1,12 @@
 package main
 
 import (
-	"clipper/jsonrpcclient"
 	"clipper/ui"
+	"clipper/wsjsonrpc"
 	"fmt"
 	"io"
 	"log"
+	"net/url"
 	"os"
 	"strings"
 )
@@ -26,17 +27,30 @@ func configureLogger() {
 
 }
 
-func StartInteractive(url string) {
+func StartInteractive(serverUrl string) {
+	var Url *url.URL
+	var err error
+
+	if serverUrl == "" {
+		Url = nil
+	} else {
+		Url, err = url.Parse(serverUrl)
+		if err != nil {
+			panic(err)
+		}
+	}
+
 	versionString := version
 	if commit != "" {
 		versionString = versionString + "-" + commit[:7]
 	}
-	rpcClient := jsonrpcclient.NewClient(url)
+
+	rpcClient := wsjsonrpc.NewWebSocketClient(Url)
 	defer func() {
 		for len(rpcClient.Incoming) > 0 {
 			<-rpcClient.Incoming
 		}
-		rpcClient.Stop(false)
+		rpcClient.Close()
 	}()
 
 	tui := ui.NewTUI(rpcClient)

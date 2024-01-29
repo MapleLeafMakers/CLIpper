@@ -2,6 +2,7 @@ package ui
 
 import (
 	"clipper/ui/cmdinput"
+	"clipper/wsjsonrpc"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -80,10 +81,7 @@ type Command_Quit struct{}
 
 func (c Command_Quit) Call(ctx cmdinput.CommandContext) error {
 	tui, _ := ctx["tui"].(*TUI)
-	err := tui.RpcClient.Stop(false)
-	if err != nil {
-		panic(err)
-	}
+	tui.RpcClient.Close()
 	tui.App.Stop()
 	return nil
 }
@@ -174,8 +172,8 @@ type Command_Print struct{}
 func (c Command_Print) Call(ctx cmdinput.CommandContext) error {
 
 	//file := ctx["file"].(string)
-	tui, _ := ctx["tui"].(*TUI)
-	tui.RpcClient.Upload(ctx["file"].(string), true)
+	//tui, _ := ctx["tui"].(*TUI)
+	//tui.RpcClient.Upload(ctx["file"].(string), true)
 	return nil
 }
 
@@ -189,7 +187,7 @@ type Command_Disconnect struct{}
 
 func (c Command_Disconnect) Call(ctx cmdinput.CommandContext) error {
 	tui, _ := ctx["tui"].(*TUI)
-	tui.RpcClient.Stop(true)
+	tui.RpcClient.Close()
 	return nil
 }
 
@@ -210,15 +208,19 @@ func (c Command_Connect) Call(ctx cmdinput.CommandContext) error {
 		if !strings.Contains("/", strings.ToLower(raw)) {
 			raw = "ws://" + raw + "/websocket"
 		}
-		server_url, err := url.Parse(raw)
+		serverUrl, err := url.Parse(raw)
 		if err != nil {
 			panic(err)
 		}
 		tui.App.QueueUpdateDraw(func() {
-			tui.Output.WriteResponse(fmt.Sprintf("Connecting to %s", server_url.String()))
+			tui.Output.WriteResponse(fmt.Sprintf("Connecting to %s", serverUrl.String()))
 		})
-		tui.RpcClient.Url = server_url.String()
-		if err := tui.RpcClient.Start(); err != nil {
+		tui.RpcClient = wsjsonrpc.NewWebSocketClient(serverUrl)
+		tui.RpcClient.SetOnConnectFunc(tui.onConnect)
+		tui.RpcClient.SetOnDisconnectFunc(tui.onDisconnect)
+		go tui.handleIncoming()
+
+		if err := tui.RpcClient.Connect(); err != nil {
 			return errors.New(fmt.Sprintf("Failed to connect: %v", err))
 		}
 	}

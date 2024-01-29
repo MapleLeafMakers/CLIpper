@@ -1,10 +1,11 @@
 package ui
 
 import (
-	"clipper/jsonrpcclient"
 	"clipper/ui/cmdinput"
+	"clipper/wsjsonrpc"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"github.com/MapleLeafMakers/tview"
 	"github.com/bykof/gostradamus"
 	"github.com/gdamore/tcell/v2"
@@ -18,7 +19,7 @@ type TUI struct {
 	Root              *tview.Grid
 	Input             *cmdinput.InputField
 	Output            *LogContent
-	RpcClient         *jsonrpcclient.Client
+	RpcClient         *wsjsonrpc.RpcClient
 	TabCompleter      cmdinput.TabCompleter
 	State             map[string]map[string]interface{}
 	HostHeader        *tview.Table
@@ -32,7 +33,7 @@ type TUI struct {
 	focusedControl interface{}
 }
 
-func NewTUI(rpcClient *jsonrpcclient.Client) *TUI {
+func NewTUI(rpcClient *wsjsonrpc.RpcClient) *TUI {
 	tui := &TUI{
 		RpcClient: rpcClient,
 	}
@@ -212,7 +213,7 @@ func (tui *TUI) buildWindow() {
 		AddItem(tui.Output.table, 0, 1, 1, 1, 0, 0, false)
 }
 
-func getObjectList(client *jsonrpcclient.Client) []string {
+func getObjectList(client *wsjsonrpc.RpcClient) []string {
 	resp, err := client.Call("printer.objects.list", map[string]interface{}{})
 	if err != nil {
 		panic(err)
@@ -282,14 +283,13 @@ func (tui *TUI) subscribe(wg *sync.WaitGroup) {
 	for _, key := range objList {
 		subs[key] = nil
 	}
-	log.Println("calling printer.objects.subscribe")
+
 	resp, err := tui.RpcClient.Call("printer.objects.subscribe", map[string]interface{}{
 		"objects": subs,
 	})
 	if err != nil {
 		panic(err)
 	}
-	log.Println("got a response")
 	asMap, _ := resp.(map[string]interface{})
 	objectsAsMap, _ := asMap["status"].(map[string]interface{})
 	state := make(map[string]map[string]interface{}, len(objectsAsMap))
@@ -297,7 +297,6 @@ func (tui *TUI) subscribe(wg *sync.WaitGroup) {
 		state[k] = v.(map[string]interface{})
 	}
 	tui.State = state
-	log.Println("Queuing initServerUI")
 	tui.App.QueueUpdateDraw(func() {
 		tui.initializeServerUI()
 	})
@@ -326,27 +325,19 @@ func toStatusMap(stat map[string]interface{}) (map[string]map[string]interface{}
 }
 
 func (tui *TUI) handleIncoming() {
-	log.Println("handleIncoming")
-	for {
-		incoming := <-tui.RpcClient.Incoming
-		switch incoming.Method {
-		case "_client_connected":
-			// rpcclient connected to server, re-init everything
-			// show some indication of connection status
-			tui.App.QueueUpdateDraw(func() {
-				tui.Output.WriteResponse("Connected to " + tui.RpcClient.Url)
-			})
-			tui.initialize()
 
-		case "_client_disconnected":
-			// rpcclient disconnected (may have been intentional) from server, stop doing stuff
-			// show some indication of connection status
-			tui.App.QueueUpdateDraw(func() {
-				tui.removeServerUI()
-				tui.Output.WriteResponse("Disconnected.")
-			})
+	for {
+		incoming, ok := <-tui.RpcClient.Incoming
+		if !ok {
+			return
+		}
+		switch incoming.Method {
 		case "notify_status_update":
-			status := incoming.Params[0].(map[string]interface{})
+			params, ok := incoming.Params.([]interface{})
+			if !ok {
+				panic(fmt.Sprintf("Unexpected non-array params, %#v", params))
+			}
+			status := params[0].(map[string]interface{})
 			statusMap, _ := toStatusMap(status)
 			tui.App.QueueUpdateDraw(func() {
 				tui.UpdateState(statusMap)
@@ -358,8 +349,12 @@ func (tui *TUI) handleIncoming() {
 			})
 
 		case "notify_gcode_response":
+			params, ok := incoming.Params.([]interface{})
+			if !ok {
+				panic(fmt.Sprintf("Unexpected non-array params, %#v", params))
+			}
 			tui.App.QueueUpdateDraw(func() {
-				for _, line := range incoming.Params {
+				for _, line := range params {
 					tui.Output.WriteResponse(line.(string))
 				}
 			})
@@ -401,9 +396,26 @@ func (tui *TUI) SwitchFocus(widget tview.Primitive) {
 	tui.App.SetFocus(widget)
 }
 
+func (tui *TUI) onConnect() {
+	tui.App.QueueUpdateDraw(func() {
+		tui.Output.WriteResponse("Connected!")
+	})
+	tui.initialize()
+}
+
+func (tui *TUI) onDisconnect() {
+	tui.App.QueueUpdateDraw(func() {
+		tui.removeServerUI()
+		tui.Output.WriteResponse("Disconnected.")
+	})
+}
+
 func (tui *TUI) connectOnStartup() {
-	if tui.RpcClient.Url != "" && !tui.RpcClient.IsConnected {
-		if err := tui.RpcClient.Start(); err != nil {
+	tui.RpcClient.SetOnConnectFunc(tui.onConnect)
+	tui.RpcClient.SetOnDisconnectFunc(tui.onDisconnect)
+	if tui.RpcClient.Url != nil && !tui.RpcClient.IsConnected {
+		log.Printf("Connecting to %#v", tui.RpcClient.Url)
+		if err := tui.RpcClient.Connect(); err != nil {
 			log.Fatalf("Failed to connect: %v", err)
 		}
 	} else if tui.RpcClient.IsConnected {
