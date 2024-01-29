@@ -28,9 +28,11 @@ type TUI struct {
 	hostname          string
 	LeftPanel         *tview.Flex
 	LeftPanelSpacer   *tview.Box
+	ServerInfo        *ServerInfo
 
 	bellPending    bool // should a bell be rung on the next Draw
 	focusedControl interface{}
+	mu             sync.Mutex
 }
 
 func NewTUI(rpcClient *wsjsonrpc.RpcClient) *TUI {
@@ -168,14 +170,8 @@ func (tui *TUI) buildLeftPanel() {
 }
 
 func (tui *TUI) initialize() {
-	log.Println("initializing")
-	wg := new(sync.WaitGroup)
-	wg.Add(2)
-	go tui.loadPrinterInfo(wg)
-	go tui.subscribe(wg)
-	go tui.loadGcodeHelp()
+	go tui.loadServerInfo()
 	log.Println("Waiting for subscribe")
-	wg.Wait()
 }
 
 func (tui *TUI) buildOutput(numLines int) {
@@ -276,8 +272,7 @@ func (tui *TUI) UpdateTheme() {
 
 }
 
-func (tui *TUI) subscribe(wg *sync.WaitGroup) {
-	defer wg.Done()
+func (tui *TUI) subscribe() {
 	objList := getObjectList(tui.RpcClient)
 	subs := make(map[string]interface{}, len(objList))
 	for _, key := range objList {
@@ -341,11 +336,6 @@ func (tui *TUI) handleIncoming() {
 			statusMap, _ := toStatusMap(status)
 			tui.App.QueueUpdateDraw(func() {
 				tui.UpdateState(statusMap)
-				if AppConfig.LogIncoming {
-					out, _ := json.MarshalIndent(status, "", " ")
-					log.Println(string(out))
-					tui.Output.WriteResponse(string(out))
-				}
 			})
 
 		case "notify_gcode_response":
@@ -358,21 +348,93 @@ func (tui *TUI) handleIncoming() {
 					tui.Output.WriteResponse(line.(string))
 				}
 			})
+
+		case "notify_klippy_ready":
+			log.Println("notify_klippy_ready!")
+			tui.ServerInfo.KlippyConnected = true
+			tui.ServerInfo.KlippyState = "ready"
+			go tui.loadServerInfo()
+			//go tui.loadPrinterInfo()
+			//go tui.loadGcodeHelp()
+			//go tui.subscribe()
+
+		case "notify_klippy_shutdown":
+			log.Println("notify_klippy_shutdown!")
+		case "notify_klippy_disconnected":
+			//tui.mu.Lock()
+			//tui.ServerInfo.KlippyConnected = false
+			//tui.ServerInfo.KlippyState = ""
+			//tui.mu.Unlock()
+			go tui.loadServerInfo()
+			tui.App.QueueUpdateDraw(func() {
+				tui.removeServerUI()
+			})
+
+			log.Println("notify_klippy_disconnected!")
+		case "notify_filelist_changed":
+		case "notify_update_response":
+		case "notify_update_refreshed":
+		case "notify_cpu_throttled":
+		case "notify_history_changed":
+		case "notify_user_created":
+		case "notify_user_deleted":
+		case "notify_user_logged_out":
+		case "notify_service_state_changed":
+		case "notify_job_queue_changed":
+		case "notify_button_event":
+		case "notify_announcement_update":
+		case "notify_announcement_dismissed":
+		case "notify_announcement_wake":
+		case "notify_sudo_alert":
+		case "notify_webcams_changed":
+		case "notify_active_spool_set":
+		case "notify_spoolman_status_changed":
+		case "notify_agent_event":
+		case "sensors:sensor_update":
 		default:
 
 		}
 	}
 }
 
-func (tui *TUI) loadPrinterInfo(wg *sync.WaitGroup) {
-	defer wg.Done()
+func (tui *TUI) loadServerInfo() {
+	resp, err := tui.RpcClient.Call("server.info", map[string]interface{}{})
+	if err != nil {
+		panic(err)
+	}
+	bytes, err := json.Marshal(resp)
+	if err != nil {
+		panic(err)
+	}
+	var si ServerInfo
+	err = json.Unmarshal(bytes, &si)
+	if err != nil {
+		panic(err)
+	}
+	tui.mu.Lock()
+	tui.ServerInfo = &si
+	tui.mu.Unlock()
+	if si.KlippyConnected && si.KlippyState == "ready" {
+		log.Println("Klippy connected, loading server ui")
+		tui.loadPrinterInfo()
+		tui.loadGcodeHelp()
+		tui.subscribe()
+	} else {
+		log.Println("Klippy not ready, need UI for this")
+	}
+	tui.App.QueueUpdateDraw(func() {})
+}
+
+func (tui *TUI) loadPrinterInfo() {
 	resp, err := tui.RpcClient.Call("printer.info", map[string]interface{}{})
 	if err != nil {
 		panic(err)
 	}
 	info, _ := resp.(map[string]interface{})
 	tui.App.QueueUpdate(func() {
+		tui.mu.Lock()
 		tui.hostname = info["hostname"].(string)
+		tui.mu.Unlock()
 	})
 }
 
