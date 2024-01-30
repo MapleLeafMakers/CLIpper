@@ -16,7 +16,7 @@ type ToolheadPanelContent struct {
 	cells     [][]*tview.TableCell
 }
 
-func NewToolheadPanel(tui *TUI) ToolheadPanelContent {
+func NewToolheadPanel(tui *TUI) *ToolheadPanelContent {
 	content := ToolheadPanelContent{
 		tui:       tui,
 		table:     tview.NewTable(),
@@ -30,7 +30,7 @@ func NewToolheadPanel(tui *TUI) ToolheadPanelContent {
 	content.table.SetContent(content)
 	content.container.AddItem(content.table, 0, 1, false)
 	content.container.SetBorder(true).SetTitle("M[o[]tion")
-	return content
+	return &content
 }
 
 func (t ToolheadPanelContent) GetRowCount() int    { return 3 }

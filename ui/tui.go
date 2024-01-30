@@ -10,6 +10,7 @@ import (
 	"github.com/bykof/gostradamus"
 	"github.com/gdamore/tcell/v2"
 	"log"
+	"regexp"
 	"sync"
 	"time"
 )
@@ -25,6 +26,7 @@ type TUI struct {
 	HostHeader        *tview.Table
 	TemperaturesPanel *TemperaturePanelContent
 	ToolheadPanel     *ToolheadPanelContent
+	PrintStatusPanel  *PrintStatusPanelContent
 	hostname          string
 	LeftPanel         *tview.Flex
 	LeftPanelSpacer   *tview.Box
@@ -153,20 +155,24 @@ func (tui *TUI) buildInput() {
 }
 
 func (tui *TUI) buildLeftPanel() {
-	flex := tview.NewFlex().SetDirection(tview.FlexRow)
-	tui.LeftPanel = flex
+	tui.LeftPanel = tview.NewFlex().SetDirection(tview.FlexRow)
+	tui.Root.AddItem(tui.LeftPanel, 0, 0, 1, 1, 0, 0, true)
+
 	tui.HostHeader = NewHostHeader(tui)
-	tui.Root.AddItem(flex, 0, 0, 1, 1, 0, 0, true)
-	flex.AddItem(tui.HostHeader, 1, 1, false)
+	tui.LeftPanel.AddItem(tui.HostHeader, 1, 1, false)
 
-	tempPanel := NewTemperaturePanel(tui)
-	tui.TemperaturesPanel = &tempPanel
+	tui.TemperaturesPanel = NewTemperaturePanel(tui)
+	tui.ToolheadPanel = NewToolheadPanel(tui)
 
-	toolheadPanel := NewToolheadPanel(tui)
-	tui.ToolheadPanel = &toolheadPanel
+	tui.PrintStatusPanel = NewPrintStatusPanel(tui)
+	printStatusSize := 0
+	if tui.State["print_stats"]["state"] != "standby" {
+		printStatusSize = 2 + tui.PrintStatusPanel.GetRowCount()
+	}
+	tui.LeftPanel.AddItem(tui.PrintStatusPanel.container, printStatusSize, 0, false)
 
 	tui.LeftPanelSpacer = tview.NewBox()
-	flex.AddItem(tui.LeftPanelSpacer, 0, 1, false)
+	tui.LeftPanel.AddItem(tui.LeftPanelSpacer, 0, 1, false)
 }
 
 func (tui *TUI) initialize() {
@@ -299,6 +305,20 @@ func (tui *TUI) subscribe() {
 
 func (tui *TUI) UpdateState(statusChanges map[string]map[string]interface{}) {
 	for key, objectStatus := range statusChanges {
+		switch key {
+		// handle some special cases here
+		case "print_stats":
+			newState, ok := objectStatus["state"].(string)
+			if ok {
+				// print_stats.state changed, might need to show/hide the print panel
+				if newState == "standby" {
+					tui.hidePrintStatus()
+				} else if tui.State["print_stats"]["state"] == "standby" {
+					tui.showPrintStatus()
+				}
+			}
+		}
+
 		for subKey, value := range objectStatus {
 			tui.State[key][subKey] = value
 			// TODO: Notify the relevant UI elements?
@@ -340,8 +360,16 @@ func (tui *TUI) handleIncoming() {
 
 		case "notify_gcode_response":
 			params, ok := incoming.Params.([]interface{})
+
 			if !ok {
 				panic(fmt.Sprintf("Unexpected non-array params, %#v", params))
+			}
+
+			filtered := make([]string, 0, len(params))
+			for _, line := range params {
+				if passesConsoleFilters(line.(string)) {
+					filtered = append(filtered, line.(string))
+				}
 			}
 			tui.App.QueueUpdateDraw(func() {
 				for _, line := range params {
@@ -395,6 +423,19 @@ func (tui *TUI) handleIncoming() {
 
 		}
 	}
+}
+
+func passesConsoleFilters(consoleOutput string) bool {
+	for _, pattern := range AppConfig.ConsoleFilterPatterns {
+		matches, err := regexp.MatchString(pattern, consoleOutput)
+		if err != nil {
+			panic(err)
+		}
+		if matches {
+			return false
+		}
+	}
+	return true
 }
 
 func (tui *TUI) loadServerInfo() {
@@ -497,6 +538,14 @@ func (tui *TUI) initializeServerUI() {
 func (tui *TUI) removeServerUI() {
 	tui.LeftPanel.RemoveItem(tui.TemperaturesPanel.container)
 	tui.LeftPanel.RemoveItem(tui.ToolheadPanel.container)
+}
+
+func (tui *TUI) hidePrintStatus() {
+	tui.LeftPanel.ResizeItem(tui.PrintStatusPanel.container, 0, 0)
+}
+
+func (tui *TUI) showPrintStatus() {
+	tui.LeftPanel.ResizeItem(tui.PrintStatusPanel.container, 2+tui.PrintStatusPanel.GetRowCount(), 0)
 }
 
 func dumpToJson(obj any) string {

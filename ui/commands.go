@@ -53,6 +53,24 @@ func (c Command_Set) Call(ctx cmdinput.CommandContext) error {
 	tui, _ := ctx["tui"].(*TUI)
 	key, _ := ctx["setting"].(string)
 	value := ctx["value"]
+	// todo: figure out a generic way to set non-simple values
+	if key == "consoleInputPatterns" {
+		tokens := strings.SplitN(ctx["raw"].(string), " ", 3)
+		rawJson := tokens[2]
+		var mapVal map[string]interface{}
+		var arrVal []interface{}
+		err := json.Unmarshal([]byte(rawJson), &mapVal)
+		if err != nil {
+			err = json.Unmarshal([]byte(rawJson), &arrVal)
+			if err != nil {
+				return errors.New("Invalid value for " + key + ": " + rawJson)
+			}
+			value = arrVal
+		} else {
+			value = mapVal
+		}
+	}
+
 	AppConfig.Set(key, value)
 	tui.Output.WriteResponse(fmt.Sprintf("Set %s to %+v", key, value))
 	AppConfig.Save()

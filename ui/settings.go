@@ -44,16 +44,20 @@ type ThemeConfig struct {
 }
 
 type Config struct {
-	LogIncoming     bool        `json:"logIncoming"`
-	TimestampFormat string      `json:"timestampFormat"`
-	Theme           ThemeConfig `json:"theme"`
+	LogIncoming           bool        `json:"logIncoming"`
+	TimestampFormat       string      `json:"timestampFormat"`
+	ConsoleFilterPatterns []string    `json:"consoleFilterPatterns"`
+	Theme                 ThemeConfig `json:"theme"`
 }
 
 var DefaultConfig = &Config{
 	LogIncoming:     false,
 	TimestampFormat: "hh:mm:ss",
+	ConsoleFilterPatterns: []string{
+		"^(?:ok\\s+)?(B|C|T\\d*):", // Temperature updates
+	},
 	Theme: ThemeConfig{
-		BackgroundColor:    "",
+		BackgroundColor:    "default",
 		BorderColor:        "white",
 		TitleColor:         "white",
 		GraphicsColor:      "white",
@@ -87,6 +91,8 @@ func (c *Config) Load() error {
 	if _, err = os.Stat(configFile); errors.Is(err, os.ErrNotExist) {
 		DefaultConfig.Save()
 	}
+	defaultCfgBytes, _ := json.Marshal(DefaultConfig)
+	json.Unmarshal(defaultCfgBytes, c)
 	cfgBytes, err := os.ReadFile(configFile)
 	err = json.Unmarshal(cfgBytes, c)
 	return err
@@ -226,7 +232,10 @@ func NewSettingsCompleter() cmdinput.StaticTokenCompleter {
 				reg[key] = cmdinput.NewColorTokenCompleter("value", nil)
 			default:
 				reg[key] = cmdinput.AnythingCompleter{"value"}
+
 			}
+		default:
+			reg[key] = cmdinput.AnythingCompleter{"value"}
 		}
 	}
 

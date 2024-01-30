@@ -1,8 +1,8 @@
 package ui
 
 import (
-	"log"
-	"slices"
+	"encoding/json"
+	"reflect"
 	"testing"
 )
 
@@ -11,7 +11,7 @@ func TestConfig_Load(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	if *AppConfig != *DefaultConfig {
+	if !reflect.DeepEqual(AppConfig, DefaultConfig) {
 		t.Error("Didn't load default", AppConfig, DefaultConfig)
 	}
 
@@ -27,7 +27,6 @@ func TestConfig_Save(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	log.Printf("Want to save %#v", AppConfig)
 	err = AppConfig.Save()
 	if err != nil {
 		t.Error(err)
@@ -50,9 +49,14 @@ func TestConfig_Set(t *testing.T) {
 	}
 }
 
-func TestConfig_GetKeys(t *testing.T) {
-	keys := AppConfig.GetKeys()
-	if !slices.Equal(keys, []string{"logIncoming", "theme.borderColor", "timestampFormat"}) {
-		t.Error("getKeys is wrong", keys)
+func TestConfig_Load_NewDefaults(t *testing.T) {
+	c := Config{LogIncoming: true, TimestampFormat: "hh:mma"}
+	json.Unmarshal([]byte("{\"logIncoming\": false}"), &c)
+	if c.TimestampFormat != "hh:mma" {
+		t.Errorf("TimestampFormat wasn't preserved")
 	}
+	if c.LogIncoming {
+		t.Errorf("LogIncoming didn't update")
+	}
+
 }

@@ -137,7 +137,14 @@ type CommandTokenCompleter struct {
 func (c CommandTokenCompleter) Match(token string, ctx CommandContext) (bool, string, *TokenCompleter) {
 	key, ok := c.caseMap[strings.ToLower(token)]
 	if !ok {
-		return false, "", nil
+		if !strings.HasPrefix(token, "/") {
+			// we should treat this as gcode.
+			var completer TokenCompleter = AnythingCompleter{"value"}
+			return true, token, &completer
+		} else {
+			return false, "", nil
+		}
+
 	}
 	cmd := c.Registry[key]
 	ctx[c.ContextKey] = cmd
@@ -316,8 +323,14 @@ type AnythingCompleter struct {
 }
 
 func (a AnythingCompleter) Match(token string, ctx CommandContext) (bool, string, *TokenCompleter) {
+	value, ok := ctx[a.ContextKey]
+	if ok {
+		token = (value.(string)) + " " + token
+	}
 	ctx[a.ContextKey] = token
-	return true, token, nil
+	var next TokenCompleter
+	next = a
+	return true, token, &next
 }
 
 func (a AnythingCompleter) Complete(token string, ctx CommandContext) (result []string, match bool) {

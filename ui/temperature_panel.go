@@ -70,7 +70,7 @@ func (t TemperaturePanelContent) GetColumnCount() int {
 	return 4
 }
 
-func NewTemperaturePanel(tui *TUI) TemperaturePanelContent {
+func NewTemperaturePanel(tui *TUI) *TemperaturePanelContent {
 	sensors := make([]TempSensor, 0, 20)
 	content := TemperaturePanelContent{
 		tui:       tui,
@@ -92,7 +92,7 @@ func NewTemperaturePanel(tui *TUI) TemperaturePanelContent {
 	table.SetContent(content)
 	content.container.AddItem(table, 0, 1, true)
 	content.container.SetBorder(true).SetTitle("[T[]emperatures")
-	return content
+	return &content
 }
 
 func (t *TemperaturePanelContent) loadSensors() {
