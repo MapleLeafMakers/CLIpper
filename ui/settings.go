@@ -35,12 +35,14 @@ type ThemeConfig struct {
 	ConsoleTimestampBackgroundColor ConfigColor `json:"consoleTimestampBackgroundColor"`
 	ConsoleTimestampTextColor       ConfigColor `json:"consoleTimestampTextColor"`
 
-	InputTextColor              ConfigColor `json:"inputTextColor"`
-	InputBackgroundColor        ConfigColor `json:"inputBackgroundColor"`
-	InputPromptColor            ConfigColor `json:"inputPromptColor"`
-	InputPlaceholderColor       ConfigColor `json:"inputPlaceholderColor"`
+	InputTextColor        ConfigColor `json:"inputTextColor"`
+	InputBackgroundColor  ConfigColor `json:"inputBackgroundColor"`
+	InputPromptColor      ConfigColor `json:"inputPromptColor"`
+	InputPlaceholderColor ConfigColor `json:"inputPlaceholderColor"`
+
 	AutocompleteBackgroundColor ConfigColor `json:"autocompleteMenuBackgroundColor"`
 	AutocompleteTextColor       ConfigColor `json:"autocompleteTextColor"`
+	AutocompleteHelpColor       ConfigColor `json:"autocompleteHelpColor"`
 }
 
 type Config struct {
@@ -76,6 +78,7 @@ var DefaultConfig = &Config{
 		InputPlaceholderColor:       "darkslategray",
 		AutocompleteBackgroundColor: "white",
 		AutocompleteTextColor:       "darkblue",
+		AutocompleteHelpColor:       "red",
 	},
 }
 

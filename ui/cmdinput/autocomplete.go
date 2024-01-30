@@ -20,7 +20,7 @@ type CommandContext map[string]interface{}
 
 type TokenCompleter interface {
 	Match(token string, ctx CommandContext) (bool, string, *TokenCompleter)
-	Complete(token string, ctx CommandContext) ([]string, bool)
+	Complete(token string, ctx CommandContext) ([]Suggestion, bool)
 }
 
 type TabCompleter struct {
@@ -43,7 +43,7 @@ func (t *TabCompleter) RegisterCommand(cmd string, command Command) {
 	t.completer.Registry[cmd] = command
 }
 
-func (t *TabCompleter) AutoComplete(currentText string, cursorPos int, ctx CommandContext) (entries []string, menuOffset int) {
+func (t *TabCompleter) AutoComplete(currentText string, cursorPos int, ctx CommandContext) (entries []Suggestion, menuOffset int) {
 	inText := currentText[:cursorPos]
 	tokens, err := shlex.Split(inText)
 	if err != nil {
@@ -126,6 +126,7 @@ func (t *TabCompleter) Parse(currentText string, ctx CommandContext) error {
 type Command interface {
 	Call(ctx CommandContext) error
 	GetCompleter(ctx CommandContext) TokenCompleter
+	GetHelp() string
 }
 
 type CommandTokenCompleter struct {
@@ -152,7 +153,7 @@ func (c CommandTokenCompleter) Match(token string, ctx CommandContext) (bool, st
 	return true, token, &completer
 }
 
-func (c CommandTokenCompleter) Complete(token string, ctx CommandContext) (results []string, match bool) {
+func (c CommandTokenCompleter) Complete(token string, ctx CommandContext) (results []Suggestion, match bool) {
 	lowerToken := strings.ToLower(token)
 	sortedKeys := make([]string, 0, len(c.caseMap))
 	for k, _ := range c.caseMap {
@@ -164,7 +165,7 @@ func (c CommandTokenCompleter) Complete(token string, ctx CommandContext) (resul
 			if lowerCmdName == lowerToken {
 				match = true
 			}
-			results = append(results, c.caseMap[lowerCmdName])
+			results = append(results, Suggestion{c.caseMap[lowerCmdName], c.Registry[c.caseMap[lowerCmdName]].GetHelp()})
 		}
 	}
 	return results, match
@@ -195,7 +196,7 @@ func (c StaticTokenCompleter) Match(token string, ctx CommandContext) (bool, str
 	return true, normalizedName, &completer
 }
 
-func (c StaticTokenCompleter) Complete(token string, ctx CommandContext) (results []string, match bool) {
+func (c StaticTokenCompleter) Complete(token string, ctx CommandContext) (results []Suggestion, match bool) {
 	lowerToken := strings.ToLower(token)
 	caseMap := c.buildCaseMap()
 	sortedKeys := make([]string, 0, len(c.Registry))
@@ -208,7 +209,7 @@ func (c StaticTokenCompleter) Complete(token string, ctx CommandContext) (result
 			if lowerCmdName == lowerToken {
 				match = true
 			}
-			results = append(results, caseMap[lowerCmdName])
+			results = append(results, Suggestion{caseMap[lowerCmdName], ""})
 		}
 	}
 	return results, match
@@ -229,14 +230,14 @@ func (c BoolTokenCompleter) Match(token string, ctx CommandContext) (bool, strin
 	return true, t, &c.Next
 }
 
-func (c BoolTokenCompleter) Complete(token string, ctx CommandContext) (results []string, match bool) {
+func (c BoolTokenCompleter) Complete(token string, ctx CommandContext) (results []Suggestion, match bool) {
 	lowerToken := strings.ToLower(token)
 	for _, lower := range []string{"false", "true"} {
 		if strings.HasPrefix(lower, lowerToken) {
 			if lower == lowerToken {
 				match = true
 			}
-			results = append(results, lower)
+			results = append(results, Suggestion{lower, ""})
 		}
 	}
 	return results, match
@@ -267,7 +268,7 @@ func (c ColorTokenCompleter) Match(token string, ctx CommandContext) (bool, stri
 	return true, token, &c.Next
 }
 
-func (c ColorTokenCompleter) Complete(token string, ctx CommandContext) (results []string, match bool) {
+func (c ColorTokenCompleter) Complete(token string, ctx CommandContext) (results []Suggestion, match bool) {
 	lowerToken := strings.ToLower(token)
 	sortedKeys := make([]string, 0, len(tcell.ColorNames)+1)
 	sortedKeys = append(sortedKeys, "default")
@@ -280,7 +281,7 @@ func (c ColorTokenCompleter) Complete(token string, ctx CommandContext) (results
 			if colorName == lowerToken {
 				match = true
 			}
-			results = append(results, colorName)
+			results = append(results, Suggestion{colorName, ""})
 		}
 	}
 	return results, match
@@ -304,7 +305,7 @@ func (f FileTokenCompleter) Match(token string, ctx CommandContext) (bool, strin
 	return true, token, &f.Next
 }
 
-func (f FileTokenCompleter) Complete(token string, ctx CommandContext) (result []string, match bool) {
+func (f FileTokenCompleter) Complete(token string, ctx CommandContext) (result []Suggestion, match bool) {
 	var pattern string
 	if filepath.IsLocal(token) {
 		pattern = filepath.Clean(token)
@@ -312,10 +313,11 @@ func (f FileTokenCompleter) Complete(token string, ctx CommandContext) (result [
 		pattern = token
 	}
 	matches, _ := filepath.Glob(pattern + "*")
+	results := make([]Suggestion, len(matches))
 	for i := 0; i < len(matches); i++ {
-		matches[i] = strings.ReplaceAll(matches[i], " ", "\\ ")
+		results[i] = Suggestion{matches[i], ""}
 	}
-	return matches, false
+	return results, false
 }
 
 type AnythingCompleter struct {
@@ -333,6 +335,6 @@ func (a AnythingCompleter) Match(token string, ctx CommandContext) (bool, string
 	return true, token, &next
 }
 
-func (a AnythingCompleter) Complete(token string, ctx CommandContext) (result []string, match bool) {
-	return []string{}, false
+func (a AnythingCompleter) Complete(token string, ctx CommandContext) (result []Suggestion, match bool) {
+	return []Suggestion{}, false
 }

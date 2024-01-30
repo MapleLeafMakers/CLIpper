@@ -21,13 +21,10 @@ type GcodeCommand struct {
 	Help string
 }
 
+func (g GcodeCommand) GetHelp() string { return g.Help }
 func (g GcodeCommand) Call(ctx cmdinput.CommandContext) error {
 	rawCommand := ctx["raw"].(string)
 	tui := ctx["tui"].(*TUI)
-
-	go tui.App.QueueUpdateDraw(func() {
-		tui.Output.WriteResponse(rawCommand)
-	})
 
 	_, err := tui.RpcClient.Call("printer.gcode.script", map[string]interface{}{"script": rawCommand})
 	if err != nil {
@@ -49,6 +46,7 @@ func NewGcodeCommand(name, help string) GcodeCommand {
 // /set command
 type Command_Set struct{}
 
+func (c Command_Set) GetHelp() string { return "Change configuration" }
 func (c Command_Set) Call(ctx cmdinput.CommandContext) error {
 	tui, _ := ctx["tui"].(*TUI)
 	key, _ := ctx["setting"].(string)
@@ -85,6 +83,7 @@ func (c Command_Set) GetCompleter(ctx cmdinput.CommandContext) cmdinput.TokenCom
 // /settings command
 type Command_Settings struct{}
 
+func (c Command_Settings) GetHelp() string { return "Display configuration" }
 func (c Command_Settings) Call(ctx cmdinput.CommandContext) error {
 	tui, _ := ctx["tui"].(*TUI)
 	str, err := json.MarshalIndent(AppConfig, "", " ")
@@ -109,7 +108,7 @@ func (c Command_Quit) Call(ctx cmdinput.CommandContext) error {
 	tui.App.Stop()
 	return nil
 }
-
+func (c Command_Quit) GetHelp() string { return "Quit the application" }
 func (c Command_Quit) GetCompleter(ctx cmdinput.CommandContext) cmdinput.TokenCompleter {
 	return nil
 }
@@ -118,6 +117,7 @@ func (c Command_Quit) GetCompleter(ctx cmdinput.CommandContext) cmdinput.TokenCo
 
 type Command_RPC struct{}
 
+func (c Command_RPC) GetHelp() string { return "Make a moonraker RPC call" }
 func (c Command_RPC) Call(ctx cmdinput.CommandContext) error {
 	tui, _ := ctx["tui"].(*TUI)
 	rawCommand := ctx["raw"].(string)
@@ -153,6 +153,7 @@ func (c Command_RPC) GetCompleter(ctx cmdinput.CommandContext) cmdinput.TokenCom
 // /restart
 type Command_Restart struct{}
 
+func (c Command_Restart) GetHelp() string { return "Restart klippy" }
 func (c Command_Restart) Call(ctx cmdinput.CommandContext) error {
 	tui, _ := ctx["tui"].(*TUI)
 	tui.RpcClient.Call("printer.restart", map[string]interface{}{})
@@ -166,6 +167,7 @@ func (c Command_Restart) GetCompleter(ctx cmdinput.CommandContext) cmdinput.Toke
 // /firmware_restart
 type Command_FirmwareRestart struct{}
 
+func (c Command_FirmwareRestart) GetHelp() string { return "Restart klippy and MCUs" }
 func (c Command_FirmwareRestart) Call(ctx cmdinput.CommandContext) error {
 	tui, _ := ctx["tui"].(*TUI)
 	tui.RpcClient.Call("printer.firmware_restart", map[string]interface{}{})
@@ -179,6 +181,7 @@ func (c Command_FirmwareRestart) GetCompleter(ctx cmdinput.CommandContext) cmdin
 // /estop
 type Command_EStop struct{}
 
+func (c Command_EStop) GetHelp() string { return "Emergency Stop!" }
 func (c Command_EStop) Call(ctx cmdinput.CommandContext) error {
 	tui, _ := ctx["tui"].(*TUI)
 	tui.RpcClient.Call("printer.emergency_stop", map[string]interface{}{})
@@ -193,6 +196,7 @@ func (c Command_EStop) GetCompleter(ctx cmdinput.CommandContext) cmdinput.TokenC
 
 type Command_Print struct{}
 
+func (c Command_Print) GetHelp() string { return "Upload and print a gcode file" }
 func (c Command_Print) Call(ctx cmdinput.CommandContext) error {
 
 	filename := ctx["file"].(string)
@@ -226,6 +230,7 @@ func (c Command_Print) GetCompleter(ctx cmdinput.CommandContext) cmdinput.TokenC
 
 type Command_Disconnect struct{}
 
+func (c Command_Disconnect) GetHelp() string { return "Disconnect from the server" }
 func (c Command_Disconnect) Call(ctx cmdinput.CommandContext) error {
 	tui, _ := ctx["tui"].(*TUI)
 	tui.RpcClient.Close()
@@ -240,6 +245,7 @@ func (c Command_Disconnect) GetCompleter(ctx cmdinput.CommandContext) cmdinput.T
 
 type Command_Connect struct{}
 
+func (c Command_Connect) GetHelp() string { return "Connect to a server" }
 func (c Command_Connect) Call(ctx cmdinput.CommandContext) error {
 	tui, _ := ctx["tui"].(*TUI)
 	if tui.RpcClient.IsConnected {

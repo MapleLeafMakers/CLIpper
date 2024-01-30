@@ -46,6 +46,11 @@ var (
 	}
 )
 
+type Suggestion struct {
+	Text string
+	Help string
+}
+
 // InputField is a one-line box into which the user can enter text. Use
 // [InputField.SetAcceptanceFunc] to accept or reject input,
 // [InputField.SetChangedFunc] to listen for changes, and
@@ -81,7 +86,7 @@ type InputField struct {
 	// An optional autocomplete function which receives the current text of the
 	// input field and returns a slice of strings to be displayed in a drop-down
 	// selection.
-	autocomplete func(text string, cursorPos int) ([]string, int)
+	autocomplete func(text string, cursorPos int) ([]Suggestion, int)
 
 	// The List object which shows the selectable autocomplete entries. If not
 	// nil, the list's main texts represent the current autocomplete entries.
@@ -94,6 +99,7 @@ type InputField struct {
 		main       tcell.Style
 		selected   tcell.Style
 		background tcell.Color
+		help       tcell.Style
 	}
 
 	commandHistory      []string
@@ -250,10 +256,11 @@ func (i *InputField) GetPlaceholderStyle() tcell.Style {
 // SetAutocompleteStyles sets the colors and style of the autocomplete entries.
 // For details, see List.SetMainTextStyle(), List.SetSelectedStyle(), and
 // Box.SetBackgroundColor().
-func (i *InputField) SetAutocompleteStyles(background tcell.Color, main, selected tcell.Style) *InputField {
+func (i *InputField) SetAutocompleteStyles(background tcell.Color, main, selected tcell.Style, help tcell.Style) *InputField {
 	i.autocompleteStyles.background = background
 	i.autocompleteStyles.main = main
 	i.autocompleteStyles.selected = selected
+	i.autocompleteStyles.help = help
 	return i
 }
 
@@ -295,7 +302,7 @@ func (i *InputField) SetDisabled(disabled bool) tview.FormItem {
 // invoked in this function and whenever the current text changes or when
 // [InputField.Autocomplete] is called. Entries are cleared when the user
 // selects an entry or presses Escape.
-func (i *InputField) SetAutocompleteFunc(callback func(currentText string, cursorPos int) (entries []string, menuOffset int)) *InputField {
+func (i *InputField) SetAutocompleteFunc(callback func(currentText string, cursorPos int) (entries []Suggestion, menuOffset int)) *InputField {
 	i.autocomplete = callback
 	i.Autocomplete()
 	return i
@@ -361,10 +368,16 @@ func (i *InputField) Autocomplete() *InputField {
 	suffixLength := 9999 // I'm just waiting for the day somebody opens an issue with this number being too small.
 	i.autocompleteList.Clear()
 	for index, entry := range entries {
-		i.autocompleteList.AddItem(entry, "", 0, nil)
-		if strings.HasPrefix(entry, text) && len(entry)-len(text) < suffixLength {
+		txt := entry.Text
+		if entry.Help != "" {
+			fg, bg, _ := i.autocompleteStyles.help.Decompose()
+			styleTag := "[" + fg.Name(true) + ":" + bg.Name(true) + ":i]"
+			txt += styleTag + " - " + entry.Help
+		}
+		i.autocompleteList.AddItem(txt, entry.Text, 0, nil)
+		if strings.HasPrefix(entry.Text, text) && len(entry.Text)-len(text) < suffixLength {
 			currentEntry = index
-			suffixLength = len(text) - len(entry)
+			suffixLength = len(text) - len(entry.Text)
 		}
 	}
 
@@ -533,7 +546,7 @@ func (i *InputField) InputHandler() func(event *tcell.EventKey, setFocus func(p 
 				return
 			case tcell.KeyEnter, tcell.KeyTab: // Intentional selection.
 				index := i.autocompleteList.GetCurrentItem()
-				text, _ := i.autocompleteList.GetItemText(index)
+				_, text := i.autocompleteList.GetItemText(index)
 				if i.autocompleted != nil {
 					source := AutocompletedEnter
 					if key == tcell.KeyTab {

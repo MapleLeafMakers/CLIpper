@@ -106,7 +106,7 @@ func (tui *TUI) buildInput() {
 	tui.TabCompleter.RegisterCommand("/disconnect", Command_Disconnect{})
 	tui.TabCompleter.RegisterCommand("/connect", Command_Connect{})
 
-	tui.Input.SetAutocompleteFunc(func(currentText string, cursorPos int) (entries []string, menuOffset int) {
+	tui.Input.SetAutocompleteFunc(func(currentText string, cursorPos int) (entries []cmdinput.Suggestion, menuOffset int) {
 		ctx := cmdinput.CommandContext{
 			"tui": tui,
 			"raw": currentText,
@@ -132,8 +132,8 @@ func (tui *TUI) buildInput() {
 			if err == nil {
 				cmd, ok := ctx["cmd"]
 				// ew
+				tui.Output.WriteCommand(ctx["raw"].(string))
 				if ok {
-					tui.Output.WriteCommand(ctx["raw"].(string))
 					cmd2, ok2 := cmd.(cmdinput.Command)
 					if ok2 {
 
@@ -254,7 +254,8 @@ func (tui *TUI) UpdateTheme() {
 		SetAutocompleteStyles(
 			AppConfig.Theme.AutocompleteBackgroundColor.Color(),
 			tcell.StyleDefault.Foreground(AppConfig.Theme.AutocompleteTextColor.Color()),
-			tcell.StyleDefault.Foreground(AppConfig.Theme.AutocompleteBackgroundColor.Color()).Background(AppConfig.Theme.AutocompleteTextColor.Color())).
+			tcell.StyleDefault.Foreground(AppConfig.Theme.AutocompleteBackgroundColor.Color()).Background(AppConfig.Theme.AutocompleteTextColor.Color()),
+			tcell.StyleDefault.Foreground(AppConfig.Theme.AutocompleteHelpColor.Color())).
 		SetPlaceholderStyle(tcell.StyleDefault.Background(AppConfig.Theme.InputBackgroundColor.Color()).Foreground(AppConfig.Theme.InputPlaceholderColor.Color()))
 
 	if tui.LeftPanel != nil {
