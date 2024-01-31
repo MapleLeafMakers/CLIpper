@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/gdamore/tcell/v2"
 	"github.com/kirsle/configdir"
+	"log"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -48,10 +49,11 @@ type ThemeConfig struct {
 }
 
 type Config struct {
-	LogIncoming           bool        `json:"logIncoming"`
-	TimestampFormat       string      `json:"timestampFormat"`
-	ConsoleFilterPatterns []string    `json:"consoleFilterPatterns"`
-	Theme                 ThemeConfig `json:"theme"`
+	LogIncoming              bool        `json:"logIncoming"`
+	TimestampFormat          string      `json:"timestampFormat"`
+	ConsoleFilterPatterns    []string    `json:"consoleFilterPatterns"`
+	CheckForUpdatesOnStartup bool        `json:"checkForUpdatesOnStartup"`
+	Theme                    ThemeConfig `json:"theme"`
 }
 
 var DefaultConfig = &Config{
@@ -60,6 +62,7 @@ var DefaultConfig = &Config{
 	ConsoleFilterPatterns: []string{
 		"^(?:ok\\s+)?(B|C|T\\d*):", // Temperature updates
 	},
+	CheckForUpdatesOnStartup: true,
 	Theme: ThemeConfig{
 		BackgroundColor:    "default",
 		BorderColor:        "white",
@@ -169,7 +172,12 @@ func (c *Config) Set(path string, value interface{}) error {
 	case reflect.Bool:
 		val, ok = value.(bool)
 		if !ok {
-			val, err = strconv.ParseBool(value.(string))
+			strVal, ok := value.(string)
+			if ok {
+				val, err = strconv.ParseBool(strVal)
+			} else {
+				err = errors.New(fmt.Sprintf("Invalid boolean value %v", value))
+			}
 		}
 
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
@@ -183,6 +191,7 @@ func (c *Config) Set(path string, value interface{}) error {
 			val, err = strconv.ParseFloat(value.(string), 64)
 		}
 	}
+	log.Println("err", err)
 	if err != nil {
 		return err
 	}

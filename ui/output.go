@@ -31,8 +31,11 @@ func (l *LogContent) Write(logEntry LogEntry) {
 	l.entries = append(l.entries, logEntry)
 }
 
-func splitToLogEntries(message string, base LogEntry) []LogEntry {
-	lines := cmdinput.WordWrap(cmdinput.Escape(message), 999) //arbitrary number to force it to only split on actual linebreaks for now
+func splitToLogEntries(message string, escape bool, base LogEntry) []LogEntry {
+	if escape {
+		message = cmdinput.Escape(message)
+	}
+	lines := cmdinput.WordWrap(message, 999) //arbitrary number to force it to only split on actual linebreaks for now
 	entries := make([]LogEntry, 0, len(lines))
 	for _, line := range lines {
 		e := base
@@ -44,13 +47,23 @@ func splitToLogEntries(message string, base LogEntry) []LogEntry {
 
 func (l *LogContent) WriteResponse(message string) {
 
-	l.entries = append(l.entries, splitToLogEntries(message, LogEntry{MsgTypeResponse, gostradamus.Now(), ""})...)
+	l.entries = append(l.entries, splitToLogEntries(message, true, LogEntry{MsgTypeResponse, gostradamus.Now(), ""})...)
 	l.table.ScrollToEnd()
 
 }
 
 func (l *LogContent) WriteCommand(message string) {
-	l.entries = append(l.entries, splitToLogEntries(message, LogEntry{MsgTypeCommand, gostradamus.Now(), ""})...)
+	l.entries = append(l.entries, splitToLogEntries(message, true, LogEntry{MsgTypeCommand, gostradamus.Now(), ""})...)
+	l.table.ScrollToEnd()
+}
+
+func (l *LogContent) WriteInternal(message string) {
+	l.entries = append(l.entries, splitToLogEntries(message, false, LogEntry{MsgTypeInternal, gostradamus.Now(), ""})...)
+	l.table.ScrollToEnd()
+}
+
+func (l *LogContent) WriteError(message string) {
+	l.entries = append(l.entries, splitToLogEntries(message, true, LogEntry{MsgTypeError, gostradamus.Now(), ""})...)
 	l.table.ScrollToEnd()
 }
 

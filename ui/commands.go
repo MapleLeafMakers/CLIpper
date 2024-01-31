@@ -69,8 +69,13 @@ func (c Command_Set) Call(ctx cmdinput.CommandContext) error {
 		}
 	}
 
-	AppConfig.Set(key, value)
-	tui.Output.WriteResponse(fmt.Sprintf("Set %s to %+v", key, value))
+	err := AppConfig.Set(key, value)
+	if err != nil {
+		tui.Output.WriteError(err.Error())
+	} else {
+		tui.Output.WriteResponse(fmt.Sprintf("Set %s to %+v", key, value))
+	}
+
 	AppConfig.Save()
 	tui.UpdateTheme()
 	return nil
@@ -290,5 +295,18 @@ func (c Command_About) Call(ctx cmdinput.CommandContext) error {
 }
 
 func (c Command_About) GetCompleter(ctx cmdinput.CommandContext) cmdinput.TokenCompleter {
-	return cmdinput.AnythingCompleter{"url"}
+	return cmdinput.AnythingCompleter{""}
+}
+
+type Command_UpdateCheck struct{}
+
+func (c Command_UpdateCheck) GetHelp() string { return "Check for CLIpper updates" }
+func (c Command_UpdateCheck) Call(ctx cmdinput.CommandContext) error {
+	tui, _ := ctx["tui"].(*TUI)
+	go tui.checkForUpdates()
+	return nil
+}
+
+func (c Command_UpdateCheck) GetCompleter(ctx cmdinput.CommandContext) cmdinput.TokenCompleter {
+	return cmdinput.AnythingCompleter{""}
 }

@@ -8,13 +8,14 @@ require (
 	github.com/gdamore/tcell/v2 v2.6.1-0.20231203215052-2917c3801e73
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/gorilla/websocket v1.5.1
+	github.com/kirsle/configdir v0.0.0-20170128060238-e45d2f54772f
 	github.com/rivo/uniseg v0.4.3
+	golang.org/x/mod v0.8.0
 )
 
 require (
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/gdamore/encoding v1.0.0 // indirect
-	github.com/kirsle/configdir v0.0.0-20170128060238-e45d2f54772f // indirect
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
 	github.com/mattn/go-runewidth v0.0.15 // indirect
 	golang.org/x/net v0.18.0 // indirect

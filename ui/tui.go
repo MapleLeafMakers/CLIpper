@@ -85,6 +85,11 @@ func NewTUI(rpcClient *wsjsonrpc.RpcClient, buildInfo *build_info.BuildInfo) *TU
 
 	go tui.handleIncoming()
 	go tui.connectOnStartup()
+	if AppConfig.CheckForUpdatesOnStartup {
+		time.AfterFunc(time.Second*5, func() {
+			tui.checkForUpdates()
+		})
+	}
 	return tui
 }
 
@@ -110,6 +115,7 @@ func (tui *TUI) buildInput() {
 	tui.TabCompleter.RegisterCommand("/disconnect", Command_Disconnect{})
 	tui.TabCompleter.RegisterCommand("/connect", Command_Connect{})
 	tui.TabCompleter.RegisterCommand("/about", Command_About{})
+	tui.TabCompleter.RegisterCommand("/updatecheck", Command_UpdateCheck{})
 	tui.Input.SetAutocompleteFunc(func(currentText string, cursorPos int) (entries []cmdinput.Suggestion, menuOffset int) {
 		ctx := cmdinput.CommandContext{
 			"tui": tui,
@@ -346,6 +352,10 @@ func toStatusMap(stat map[string]interface{}) (map[string]map[string]interface{}
 	return statusMap, nil
 }
 
+func (tui *TUI) checkForUpdates() {
+	build_info.CheckForUpdates(tui.BuildInfo.VersionString, tui.onUpdateCheck)
+}
+
 func (tui *TUI) handleIncoming() {
 
 	for {
@@ -577,6 +587,22 @@ CLIpper is free and open source software licensed under the GNU General Public L
 		tui.BuildInfo.BuildTime.Format("YYYY-MM-DD, hh:mm:ss"), tui.BuildInfo.BuildOS, tui.BuildInfo.BuildArch))
 
 	tui.Pages.AddPage("about-modal", modal, false, true)
+}
+
+func (tui *TUI) onUpdateCheck(updateAvailable bool, newVersion string, newVersionUrl string, err error) {
+	if err != nil {
+		tui.App.QueueUpdateDraw(func() {
+			tui.Output.WriteResponse("Update check failed: " + err.Error())
+		})
+	} else if updateAvailable {
+		tui.App.QueueUpdateDraw(func() {
+			tui.Output.WriteInternal(fmt.Sprintf("[::b]%s of CLIpper is available! [:::%s]Get it now![:::-]", newVersion, newVersionUrl))
+		})
+	} else {
+		tui.App.QueueUpdateDraw(func() {
+			tui.Output.WriteResponse("You are running the latest release of CLIpper")
+		})
+	}
 }
 
 func dumpToJson(obj any) string {
