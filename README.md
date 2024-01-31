@@ -60,7 +60,7 @@ go build
 You can also include version and git commit information in the build using:
     
 ```shell
- go build -v -ldflags="-X main.buildCommit=$(git describe --always --long --dirty) -X main.buildVersion=v9.99.255 -X main.buildTime=$(date +%s) -X main.buildArch=$GOARCH -X main.buildOS=$GOOSx"
+ go build -v -ldflags="-X main.buildCommit=$(git describe --always --long --dirty) -X main.buildVersion=v9.99.255 -X main.buildTime=$(date +%s) -X main.buildArch=$GOARCH -X main.buildOS=$GOOS"
 ```
 
 © 2024 MapleLeafMakers
