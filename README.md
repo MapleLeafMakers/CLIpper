@@ -21,6 +21,7 @@ Just extract, and put the `clipper` or `clipper.exe` wherever you want.
 
 run the `clipper` executable, optionally passing a hostname, ip address, or full url to the moonraker websocket server to connect to on startup
 ```shell
+./clipper
 ./clipper 192.168.1.100
 ./clipper trident.local
 ./clipper ws://mainsailos.local/websocket
