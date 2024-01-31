@@ -137,12 +137,12 @@ func toDisplayName(key string) string {
 func getIcon(sType string) string {
 	switch sType {
 	case "heater_bed":
-		return "🛏"
+		return "🛏 "
 	case "heater_generic":
-		return "♨"
+		return "♨ "
 	case "extruder":
-		return "⛊"
+		return "⛊ "
 	default:
-		return "🌡"
+		return "🌡 "
 	}
 }

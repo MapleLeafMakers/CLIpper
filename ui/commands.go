@@ -277,3 +277,18 @@ func (c Command_Connect) Call(ctx cmdinput.CommandContext) error {
 func (c Command_Connect) GetCompleter(ctx cmdinput.CommandContext) cmdinput.TokenCompleter {
 	return cmdinput.AnythingCompleter{"url"}
 }
+
+type Command_About struct{}
+
+func (c Command_About) GetHelp() string { return "About CLIpper" }
+func (c Command_About) Call(ctx cmdinput.CommandContext) error {
+	tui, _ := ctx["tui"].(*TUI)
+	tui.App.QueueUpdateDraw(func() {
+		tui.showAboutDialog()
+	})
+	return nil
+}
+
+func (c Command_About) GetCompleter(ctx cmdinput.CommandContext) cmdinput.TokenCompleter {
+	return cmdinput.AnythingCompleter{"url"}
+}

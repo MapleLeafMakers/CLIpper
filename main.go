@@ -41,9 +41,9 @@ func StartInteractive(serverUrl string) {
 	}
 
 	versionString := version
-	if commit != "" {
-		versionString = versionString + "-" + commit[:7]
-	}
+	//if commit != "" {
+	//	versionString = versionString + "-" + commit[:7]
+	//}
 
 	rpcClient := wsjsonrpc.NewWebSocketClient(Url)
 	defer func() {
@@ -53,7 +53,7 @@ func StartInteractive(serverUrl string) {
 		rpcClient.Close()
 	}()
 
-	tui := ui.NewTUI(rpcClient)
+	tui := ui.NewTUI(rpcClient, versionString)
 	if err := tui.App.Run(); err != nil {
 		fmt.Println("could not run program:", err)
 		os.Exit(1)
@@ -61,7 +61,6 @@ func StartInteractive(serverUrl string) {
 }
 
 func main() {
-
 	configureLogger()
 	ui.AppConfig.Load()
 	log.Printf("%#v", ui.AppConfig)

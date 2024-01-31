@@ -11,9 +11,10 @@ import (
 )
 
 type CompletionState struct {
-	RawText   string
-	CursorPos int
-	tokens    []string
+	RawText         string
+	CursorPos       int
+	tokens          []string
+	lastSuggestions []Suggestion
 }
 
 type CommandContext map[string]interface{}
@@ -56,7 +57,7 @@ func (t *TabCompleter) AutoComplete(currentText string, cursorPos int, ctx Comma
 		tokens = append(tokens, "")
 	}
 
-	t.completionState = CompletionState{currentText, cursorPos, tokens}
+	t.completionState = CompletionState{currentText, cursorPos, tokens, nil}
 	lastTokenIdx := len(tokens) - 1
 
 	var currentCompleter TokenCompleter = t.completer
@@ -64,8 +65,8 @@ func (t *TabCompleter) AutoComplete(currentText string, cursorPos int, ctx Comma
 	for i, token := range tokens {
 		if i == lastTokenIdx {
 			// this is the one we're completing
-			results, _ := currentCompleter.Complete(token, ctx)
-			return results, strings.LastIndex(inText, tokens[lastTokenIdx])
+			t.completionState.lastSuggestions, _ = currentCompleter.Complete(token, ctx)
+			return t.completionState.lastSuggestions, strings.LastIndex(inText, tokens[lastTokenIdx])
 		} else {
 			// these tokens are ones we're just matching through to get to the right one
 			match, _, next := currentCompleter.Match(token, ctx)
@@ -87,13 +88,27 @@ func (t *TabCompleter) OnAutoCompleted(text string, index, source int) (closeMen
 	switch source {
 	case AutocompletedNavigate:
 		return false, t.completionState.RawText, t.completionState.CursorPos
-	default:
+	case AutocompletedEnter:
 		currentText := t.completionState.RawText
 		inText := currentText[:t.completionState.CursorPos]
 		afterText := currentText[t.completionState.CursorPos:]
 		preText := inText[:strings.LastIndex(inText, t.completionState.tokens[len(t.completionState.tokens)-1])]
 		return true, preText + text + afterText, len(preText) + len(text)
+	case AutocompletedTab:
+		suggTexts := make([]string, 0, len(t.completionState.lastSuggestions))
+		for _, sugg := range t.completionState.lastSuggestions {
+			suggTexts = append(suggTexts, sugg.Text)
+		}
+		lcp := longestCommonPrefix(suggTexts)
+		currentText := t.completionState.RawText
+		inText := currentText[:t.completionState.CursorPos]
+		afterText := currentText[t.completionState.CursorPos:]
+		preText := inText[:strings.LastIndex(inText, t.completionState.tokens[len(t.completionState.tokens)-1])]
+		return false, preText + lcp + afterText, len(preText) + len(lcp)
+	default:
+		return false, t.completionState.RawText, t.completionState.CursorPos
 	}
+
 }
 
 func (t *TabCompleter) Parse(currentText string, ctx CommandContext) error {
@@ -117,6 +132,23 @@ func (t *TabCompleter) Parse(currentText string, ctx CommandContext) error {
 		currentCompleter = *next
 	}
 	return nil
+}
+
+func longestCommonPrefix(strs []string) string {
+	if len(strs) == 0 {
+		return ""
+	}
+
+	prefix := strs[0]
+	for _, str := range strs {
+		for len(str) < len(prefix) || str[:len(prefix)] != prefix {
+			prefix = prefix[:len(prefix)-1]
+			if prefix == "" {
+				return ""
+			}
+		}
+	}
+	return prefix
 }
 
 //

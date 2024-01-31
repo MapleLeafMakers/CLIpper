@@ -17,6 +17,7 @@ import (
 
 type TUI struct {
 	App               *tview.Application
+	Pages             *tview.Pages
 	Root              *tview.Grid
 	Input             *cmdinput.InputField
 	Output            *LogContent
@@ -31,22 +32,24 @@ type TUI struct {
 	LeftPanel         *tview.Flex
 	LeftPanelSpacer   *tview.Box
 	ServerInfo        *ServerInfo
+	VersionString     string
 
 	bellPending    bool // should a bell be rung on the next Draw
 	focusedControl interface{}
 	mu             sync.Mutex
 }
 
-func NewTUI(rpcClient *wsjsonrpc.RpcClient) *TUI {
+func NewTUI(rpcClient *wsjsonrpc.RpcClient, versionString string) *TUI {
 	tui := &TUI{
-		RpcClient: rpcClient,
+		VersionString: versionString,
+		RpcClient:     rpcClient,
 	}
 
 	tview.Styles.PrimitiveBackgroundColor = tcell.ColorDefault
 	tui.buildInput()
 	tui.buildOutput(100)
 	tui.buildWindow()
-	tui.App = tview.NewApplication().SetRoot(tui.Root, true).EnableMouse(true)
+	tui.App = tview.NewApplication().SetRoot(tui.Pages, true).EnableMouse(true)
 	tui.App.SetBeforeDrawFunc(func(screen tcell.Screen) bool {
 		if tui.bellPending {
 			tui.bellPending = false
@@ -105,7 +108,7 @@ func (tui *TUI) buildInput() {
 	tui.TabCompleter.RegisterCommand("/print", Command_Print{})
 	tui.TabCompleter.RegisterCommand("/disconnect", Command_Disconnect{})
 	tui.TabCompleter.RegisterCommand("/connect", Command_Connect{})
-
+	tui.TabCompleter.RegisterCommand("/about", Command_About{})
 	tui.Input.SetAutocompleteFunc(func(currentText string, cursorPos int) (entries []cmdinput.Suggestion, menuOffset int) {
 		ctx := cmdinput.CommandContext{
 			"tui": tui,
@@ -166,7 +169,8 @@ func (tui *TUI) buildLeftPanel() {
 
 	tui.PrintStatusPanel = NewPrintStatusPanel(tui)
 	printStatusSize := 0
-	if tui.State["print_stats"]["state"] != "standby" {
+	if state, ok := tui.State["print_stats"]["state"]; ok && state != "standby" {
+		log.Println("Sizing the thing to not 1 because:" + tui.State["print_stats"]["state"].(string))
 		printStatusSize = 2 + tui.PrintStatusPanel.GetRowCount()
 	}
 	tui.LeftPanel.AddItem(tui.PrintStatusPanel.container, printStatusSize, 0, false)
@@ -186,15 +190,13 @@ func (tui *TUI) buildOutput(numLines int) {
 	ts := gostradamus.DateTimeFromTime(time.Time{})
 	lines := make([]LogEntry, numLines)
 	i := 0
-	for i = 0; i < numLines-6; i++ {
+	for i = 0; i < numLines-4; i++ {
 		lines[i] = LogEntry{MsgTypeInternal, ts, ""}
 	}
-	lines[i+0] = LogEntry{MsgTypeInternal, gostradamus.Now(), "[yellow]   ________    ____                     "}
-	lines[i+1] = LogEntry{MsgTypeInternal, gostradamus.Now(), "[yellow]  / ____/ /   /  _/___  ____  ___  _____"}
-	lines[i+2] = LogEntry{MsgTypeInternal, gostradamus.Now(), "[yellow] / /   / /    / // __ \\/ __ \\/ _ \\/ ___/"}
-	lines[i+3] = LogEntry{MsgTypeInternal, gostradamus.Now(), "[yellow]/ /___/ /____/ // /_/ / /_/ /  __/ /    "}
-	lines[i+4] = LogEntry{MsgTypeInternal, gostradamus.Now(), "[yellow]\\____/_____/___/ .___/ .___/\\___/_/     "}
-	lines[i+5] = LogEntry{MsgTypeInternal, gostradamus.Now(), "[yellow]              /_/   /_/                 "}
+	lines[i+0] = LogEntry{MsgTypeInternal, gostradamus.Now(), "[yellow]┏┓┓ ┳        "}
+	lines[i+1] = LogEntry{MsgTypeInternal, gostradamus.Now(), "[yellow]┃ ┃ ┃┏┓┏┓┏┓┏┓"}
+	lines[i+2] = LogEntry{MsgTypeInternal, gostradamus.Now(), "[yellow]┗┛┗┛┻┣┛┣┛┗ ┛ "}
+	lines[i+3] = LogEntry{MsgTypeInternal, gostradamus.Now(), "[yellow]     ┛ ┛     "}
 
 	tui.Output = &LogContent{
 		table:   output,
@@ -206,6 +208,7 @@ func (tui *TUI) buildOutput(numLines int) {
 }
 
 func (tui *TUI) buildWindow() {
+
 	tui.Root = tview.NewGrid().
 		SetBordersColor(tview.Styles.BorderColor).
 		SetRows(0, 1).
@@ -213,6 +216,8 @@ func (tui *TUI) buildWindow() {
 		SetBorders(true).
 		AddItem(tui.Input, 1, 0, 1, 2, 0, 0, false).
 		AddItem(tui.Output.table, 0, 1, 1, 1, 0, 0, false)
+	tui.Pages = tview.NewPages()
+	tui.Pages.AddPage("main", tui.Root, true, true)
 }
 
 func getObjectList(client *wsjsonrpc.RpcClient) []string {
@@ -528,7 +533,6 @@ func (tui *TUI) connectOnStartup() {
 }
 
 func (tui *TUI) initializeServerUI() {
-	log.Println("Initializing Server UI")
 	tui.TemperaturesPanel.loadSensors()
 	tui.LeftPanel.RemoveItem(tui.LeftPanelSpacer)
 	tui.LeftPanel.AddItem(tui.TemperaturesPanel.container, len(tui.TemperaturesPanel.sensors)+2, 0, false)
@@ -547,6 +551,22 @@ func (tui *TUI) hidePrintStatus() {
 
 func (tui *TUI) showPrintStatus() {
 	tui.LeftPanel.ResizeItem(tui.PrintStatusPanel.container, 2+tui.PrintStatusPanel.GetRowCount(), 0)
+}
+
+func (tui *TUI) showAboutDialog() {
+	logo := "┏┓┓ ┳        \n┃ ┃ ┃┏┓┏┓┏┓┏┓\n┗┛┗┛┻┣┛┣┛┗ ┛ \n     ┛ ┛     "
+	modal := tview.NewModal().AddButtons([]string{"OK"}).SetDoneFunc(func(buttonIndex int, buttonLabel string) {
+		tui.Pages.RemovePage("about-modal")
+	})
+	modal.SetText(fmt.Sprintf(`%s
+%s
+[::i]Copyright © 2024, MapleLeafMakers[::-]
+
+For new versions, bug reports or information on contributing, see the [:::http://github.com/MapleLeafMakers/CLIpper]Github Repository[:::-]
+
+CLIpper is free and open source software licensed under the GNU General Public License Version 3.
+`, logo, tui.VersionString))
+	tui.Pages.AddPage("about-modal", modal, false, true)
 }
 
 func dumpToJson(obj any) string {
