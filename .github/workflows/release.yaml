@@ -35,4 +35,4 @@ jobs:
           build_flags: -v
           binary_name: clipper
           extra_files: LICENSE.md README.md
-          ldflags: -X "main.version=${{ env.APP_VERSION }}" -X "main.commit=${{ github.sha }}"
+          ldflags: -X "main.buildVersion=${{ env.APP_VERSION }}" -X "main.buildCommit=${{ github.sha }}" -X main.buildTime=$(date +%s) -X main.buildArch=${{ matrix.goos }} -X main.buildOS=${{ matrix.goarch }}"

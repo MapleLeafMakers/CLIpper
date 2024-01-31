@@ -104,7 +104,7 @@ func (t *TabCompleter) OnAutoCompleted(text string, index, source int) (closeMen
 		inText := currentText[:t.completionState.CursorPos]
 		afterText := currentText[t.completionState.CursorPos:]
 		preText := inText[:strings.LastIndex(inText, t.completionState.tokens[len(t.completionState.tokens)-1])]
-		return false, preText + lcp + afterText, len(preText) + len(lcp)
+		return len(t.completionState.lastSuggestions) == 1, preText + lcp + afterText, len(preText) + len(lcp)
 	default:
 		return false, t.completionState.RawText, t.completionState.CursorPos
 	}

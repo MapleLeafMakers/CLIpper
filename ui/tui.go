@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"clipper/build_info"
 	"clipper/ui/cmdinput"
 	"clipper/wsjsonrpc"
 	"encoding/json"
@@ -32,17 +33,17 @@ type TUI struct {
 	LeftPanel         *tview.Flex
 	LeftPanelSpacer   *tview.Box
 	ServerInfo        *ServerInfo
-	VersionString     string
+	BuildInfo         *build_info.BuildInfo
 
 	bellPending    bool // should a bell be rung on the next Draw
 	focusedControl interface{}
 	mu             sync.Mutex
 }
 
-func NewTUI(rpcClient *wsjsonrpc.RpcClient, versionString string) *TUI {
+func NewTUI(rpcClient *wsjsonrpc.RpcClient, buildInfo *build_info.BuildInfo) *TUI {
 	tui := &TUI{
-		VersionString: versionString,
-		RpcClient:     rpcClient,
+		BuildInfo: buildInfo,
+		RpcClient: rpcClient,
 	}
 
 	tview.Styles.PrimitiveBackgroundColor = tcell.ColorDefault
@@ -193,10 +194,10 @@ func (tui *TUI) buildOutput(numLines int) {
 	for i = 0; i < numLines-4; i++ {
 		lines[i] = LogEntry{MsgTypeInternal, ts, ""}
 	}
-	lines[i+0] = LogEntry{MsgTypeInternal, gostradamus.Now(), "[yellow]┏┓┓ ┳        "}
+	lines[i+0] = LogEntry{MsgTypeInternal, gostradamus.Now(), "[yellow]┏┓┓ ┳ "}
 	lines[i+1] = LogEntry{MsgTypeInternal, gostradamus.Now(), "[yellow]┃ ┃ ┃┏┓┏┓┏┓┏┓"}
 	lines[i+2] = LogEntry{MsgTypeInternal, gostradamus.Now(), "[yellow]┗┛┗┛┻┣┛┣┛┗ ┛ "}
-	lines[i+3] = LogEntry{MsgTypeInternal, gostradamus.Now(), "[yellow]     ┛ ┛     "}
+	lines[i+3] = LogEntry{MsgTypeInternal, gostradamus.Now(), "[yellow]     ┛ ┛ [-]" + tui.BuildInfo.VersionString}
 
 	tui.Output = &LogContent{
 		table:   output,
@@ -214,7 +215,7 @@ func (tui *TUI) buildWindow() {
 		SetRows(0, 1).
 		SetColumns(36, 0).
 		SetBorders(true).
-		AddItem(tui.Input, 1, 0, 1, 2, 0, 0, false).
+		AddItem(tui.Input, 1, 0, 1, 2, 0, 0, true).
 		AddItem(tui.Output.table, 0, 1, 1, 1, 0, 0, false)
 	tui.Pages = tview.NewPages()
 	tui.Pages.AddPage("main", tui.Root, true, true)
@@ -554,18 +555,27 @@ func (tui *TUI) showPrintStatus() {
 }
 
 func (tui *TUI) showAboutDialog() {
-	logo := "┏┓┓ ┳        \n┃ ┃ ┃┏┓┏┓┏┓┏┓\n┗┛┗┛┻┣┛┣┛┗ ┛ \n     ┛ ┛     "
+	logo := ("┏┓┓ ┳        \n" +
+		"┃ ┃ ┃┏┓┏┓┏┓┏┓\n" +
+		"┗┛┗┛┻┣┛┣┛┗ ┛ \n" +
+		"     ┛ ┛     ")
 	modal := tview.NewModal().AddButtons([]string{"OK"}).SetDoneFunc(func(buttonIndex int, buttonLabel string) {
 		tui.Pages.RemovePage("about-modal")
 	})
 	modal.SetText(fmt.Sprintf(`%s
 %s
+
 [::i]Copyright © 2024, MapleLeafMakers[::-]
 
 For new versions, bug reports or information on contributing, see the [:::http://github.com/MapleLeafMakers/CLIpper]Github Repository[:::-]
 
 CLIpper is free and open source software licensed under the GNU General Public License Version 3.
-`, logo, tui.VersionString))
+
+[::i]%s-%s
+[::i](%s / %s / %s)[::-]
+`, logo, tui.BuildInfo.VersionString, tui.BuildInfo.VersionString, tui.BuildInfo.CommitHash,
+		tui.BuildInfo.BuildTime.Format("YYYY-MM-DD, hh:mm:ss"), tui.BuildInfo.BuildOS, tui.BuildInfo.BuildArch))
+
 	tui.Pages.AddPage("about-modal", modal, false, true)
 }
 

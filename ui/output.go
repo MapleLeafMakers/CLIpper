@@ -4,12 +4,14 @@ import (
 	"clipper/ui/cmdinput"
 	"github.com/MapleLeafMakers/tview"
 	"github.com/bykof/gostradamus"
+	"github.com/gdamore/tcell/v2"
 )
 
 const (
 	MsgTypeCommand  = iota
 	MsgTypeResponse = iota
 	MsgTypeInternal = iota
+	MsgTypeError    = iota
 )
 
 type LogEntry struct {
@@ -69,7 +71,16 @@ func (l LogContent) GetCell(row, column int) *tview.TableCell {
 		}
 		return cell
 	case 1:
-		return tview.NewTableCell(" " + l.entries[row].Message).SetTextColor(AppConfig.Theme.ConsoleTextColor.Color())
+		var textColor tcell.Color
+		switch l.entries[row].Type {
+		case MsgTypeCommand:
+			textColor = AppConfig.Theme.ConsoleCommandColor.Color()
+		case MsgTypeResponse, MsgTypeInternal:
+			textColor = AppConfig.Theme.ConsoleResponseColor.Color()
+		case MsgTypeError:
+			textColor = AppConfig.Theme.ConsoleErrorColor.Color()
+		}
+		return tview.NewTableCell(" " + l.entries[row].Message).SetTextColor(textColor)
 	}
 	return nil
 }

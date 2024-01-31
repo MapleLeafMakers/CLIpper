@@ -1,18 +1,39 @@
 package main
 
 import (
+	"clipper/build_info"
 	"clipper/ui"
 	"clipper/wsjsonrpc"
 	"fmt"
+	"github.com/bykof/gostradamus"
 	"io"
 	"log"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 )
 
-var version = "?"
-var commit = ""
+var buildVersion string = ""
+var buildTime string = ""
+var buildCommit = ""
+var buildArch = ""
+var buildOS = ""
+
+var buildInfo = func() *build_info.BuildInfo {
+	bt, err := strconv.Atoi(buildTime)
+	if err != nil {
+		bt = 0
+	}
+
+	return &build_info.BuildInfo{
+		BuildArch:     buildArch,
+		BuildOS:       buildOS,
+		VersionString: buildVersion,
+		CommitHash:    buildCommit,
+		BuildTime:     gostradamus.FromUnixTimestamp(int64(bt)),
+	}
+}()
 
 func configureLogger() {
 	if os.Getenv("DEBUG") == "1" {
@@ -40,11 +61,6 @@ func StartInteractive(serverUrl string) {
 		}
 	}
 
-	versionString := version
-	//if commit != "" {
-	//	versionString = versionString + "-" + commit[:7]
-	//}
-
 	rpcClient := wsjsonrpc.NewWebSocketClient(Url)
 	defer func() {
 		for len(rpcClient.Incoming) > 0 {
@@ -53,7 +69,7 @@ func StartInteractive(serverUrl string) {
 		rpcClient.Close()
 	}()
 
-	tui := ui.NewTUI(rpcClient, versionString)
+	tui := ui.NewTUI(rpcClient, buildInfo)
 	if err := tui.App.Run(); err != nil {
 		fmt.Println("could not run program:", err)
 		os.Exit(1)

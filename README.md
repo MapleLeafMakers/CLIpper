@@ -19,8 +19,7 @@ Just extract, and put the `clipper` or `clipper.exe` wherever you want.
 
 ## Usage
 
-run the `clipper` executable, passing a hostname, ip address, or full url to the moonraker websocket server.
-
+run the `clipper` executable, optionally passing a hostname, ip address, or full url to the moonraker websocket server to connect to on startup
 ```shell
 ./clipper 192.168.1.100
 ./clipper trident.local
@@ -60,7 +59,7 @@ go build
 You can also include version and git commit information in the build using:
     
 ```shell
-go build -v -ldflags="-X main.commit=$(git describe --always --long --dirty) -X main.version=v0.0.0"
+ go build -v -ldflags="-X main.buildCommit=$(git describe --always --long --dirty) -X main.buildVersion=v9.99.255 -X main.buildTime=$(date +%s) -X main.buildArch=$GOARCH -X main.buildOS=$GOOSx"
 ```
 
 © 2024 MapleLeafMakers

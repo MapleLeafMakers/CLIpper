@@ -31,7 +31,9 @@ type ThemeConfig struct {
 	TertiaryTextColor  ConfigColor `json:"tertiaryTextColor"`
 
 	ConsoleBackgroundColor          ConfigColor `json:"consoleBackgroundColor"`
-	ConsoleTextColor                ConfigColor `json:"consoleTextColor"`
+	ConsoleResponseColor            ConfigColor `json:"consoleResponseColor"`
+	ConsoleCommandColor             ConfigColor `json:"consoleCommandColor"`
+	ConsoleErrorColor               ConfigColor `json:"consoleErrorColor"`
 	ConsoleTimestampBackgroundColor ConfigColor `json:"consoleTimestampBackgroundColor"`
 	ConsoleTimestampTextColor       ConfigColor `json:"consoleTimestampTextColor"`
 
@@ -68,7 +70,9 @@ var DefaultConfig = &Config{
 		TertiaryTextColor:  "green",
 
 		ConsoleBackgroundColor:          "default",
-		ConsoleTextColor:                "white",
+		ConsoleResponseColor:            "white",
+		ConsoleCommandColor:             "yellow",
+		ConsoleErrorColor:               "red",
 		ConsoleTimestampBackgroundColor: "darkslategray",
 		ConsoleTimestampTextColor:       "white",
 
