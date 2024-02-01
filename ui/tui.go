@@ -21,6 +21,7 @@ type TUI struct {
 	Pages             *tview.Pages
 	Root              *tview.Grid
 	Input             *cmdinput.InputField
+	TempInput         *cmdinput.InputField
 	Output            *LogContent
 	RpcClient         *wsjsonrpc.RpcClient
 	TabCompleter      cmdinput.TabCompleter
@@ -172,12 +173,14 @@ func (tui *TUI) buildLeftPanel() {
 	tui.LeftPanel.AddItem(tui.HostHeader, 1, 1, false)
 
 	tui.TemperaturesPanel = NewTemperaturePanel(tui)
+	tui.LeftPanel.AddItem(tui.TemperaturesPanel.container, 0, 0, false)
+
 	tui.ToolheadPanel = NewToolheadPanel(tui)
+	tui.LeftPanel.AddItem(tui.ToolheadPanel.container, 0, 0, false)
 
 	tui.PrintStatusPanel = NewPrintStatusPanel(tui)
 	printStatusSize := 0
 	if state, ok := tui.State["print_stats"]["state"]; ok && state != "standby" {
-		log.Println("Sizing the thing to not 1 because:" + tui.State["print_stats"]["state"].(string))
 		printStatusSize = 2 + tui.PrintStatusPanel.GetRowCount()
 	}
 	tui.LeftPanel.AddItem(tui.PrintStatusPanel.container, printStatusSize, 0, false)
@@ -188,7 +191,38 @@ func (tui *TUI) buildLeftPanel() {
 
 func (tui *TUI) initialize() {
 	go tui.loadServerInfo()
-	log.Println("Waiting for subscribe")
+}
+
+func (tui *TUI) restoreCommandInput() {
+	tui.Root.RemoveItem(tui.TempInput)
+	tui.Root.AddItem(tui.Input, 1, 0, 1, 2, 0, 0, true)
+	tui.App.SetFocus(tui.Input)
+}
+
+func (tui *TUI) promptForInput(prompt string, defaultValue string, callback func(bool, string)) {
+	tui.TempInput = cmdinput.NewInputField().
+		SetText(defaultValue).
+		SetLabel(prompt).
+		SetDoneFunc(func(key tcell.Key) {
+			tui.restoreCommandInput()
+			callback(key == tcell.KeyEnter, tui.TempInput.GetText())
+		}).SetLabelStyle(
+		tcell.StyleDefault.Background(AppConfig.Theme.InputBackgroundColor.Color()).
+			Foreground(AppConfig.Theme.InputPromptColor.Color()).Bold(true)).
+		SetFieldBackgroundColor(AppConfig.Theme.InputBackgroundColor.Color()).
+		SetFieldTextColor(AppConfig.Theme.InputTextColor.Color()).
+		SetPlaceholderStyle(tcell.StyleDefault.Background(AppConfig.Theme.InputBackgroundColor.Color()).Foreground(AppConfig.Theme.InputPlaceholderColor.Color()))
+
+	tui.Root.RemoveItem(tui.Input)
+	tui.Root.AddItem(tui.TempInput, 1, 0, 1, 2, 0, 0, true)
+	tui.App.QueueUpdateDraw(func() {
+
+		tui.App.SetFocus(tui.TempInput)
+		// this is a dirty hack but it's the only thing that seems to work semi-consistently
+		time.AfterFunc(time.Millisecond*50, func() {
+			tui.TempInput.Select(0, len(tui.TempInput.GetText()))
+		})
+	})
 }
 
 func (tui *TUI) buildOutput(numLines int) {
@@ -263,12 +297,12 @@ func (tui *TUI) UpdateTheme() {
 			Foreground(AppConfig.Theme.InputPromptColor.Color()).Bold(true)).
 		SetFieldBackgroundColor(AppConfig.Theme.InputBackgroundColor.Color()).
 		SetFieldTextColor(AppConfig.Theme.InputTextColor.Color()).
+		SetPlaceholderStyle(tcell.StyleDefault.Background(AppConfig.Theme.InputBackgroundColor.Color()).Foreground(AppConfig.Theme.InputPlaceholderColor.Color())).
 		SetAutocompleteStyles(
 			AppConfig.Theme.AutocompleteBackgroundColor.Color(),
 			tcell.StyleDefault.Foreground(AppConfig.Theme.AutocompleteTextColor.Color()),
 			tcell.StyleDefault.Foreground(AppConfig.Theme.AutocompleteBackgroundColor.Color()).Background(AppConfig.Theme.AutocompleteTextColor.Color()),
-			tcell.StyleDefault.Foreground(AppConfig.Theme.AutocompleteHelpColor.Color())).
-		SetPlaceholderStyle(tcell.StyleDefault.Background(AppConfig.Theme.InputBackgroundColor.Color()).Foreground(AppConfig.Theme.InputPlaceholderColor.Color()))
+			tcell.StyleDefault.Foreground(AppConfig.Theme.AutocompleteHelpColor.Color()))
 
 	if tui.LeftPanel != nil {
 		tui.LeftPanel.SetBackgroundColor(tview.Styles.PrimitiveBackgroundColor)
@@ -509,7 +543,17 @@ func (tui *TUI) loadGcodeHelp() {
 }
 
 func (tui *TUI) ExecuteGcode(gcode string) {
-	log.Println("Executing GCODE:\n" + gcode)
+	go func() {
+		tui.App.QueueUpdateDraw(func() {
+			tui.Output.WriteCommand(gcode)
+		})
+		_, err := tui.RpcClient.Call("printer.gcode.script", map[string]interface{}{"script": gcode})
+		if err != nil {
+			tui.App.QueueUpdateDraw(func() {
+				tui.Output.WriteError(err.Error())
+			})
+		}
+	}()
 }
 
 func (tui *TUI) SwitchFocus(widget tview.Primitive) {
@@ -545,15 +589,13 @@ func (tui *TUI) connectOnStartup() {
 
 func (tui *TUI) initializeServerUI() {
 	tui.TemperaturesPanel.loadSensors()
-	tui.LeftPanel.RemoveItem(tui.LeftPanelSpacer)
-	tui.LeftPanel.AddItem(tui.TemperaturesPanel.container, len(tui.TemperaturesPanel.sensors)+2, 0, false)
-	tui.LeftPanel.AddItem(tui.ToolheadPanel.container, 5, 0, false)
-	tui.LeftPanel.AddItem(tui.LeftPanelSpacer, 0, 1, false)
+	tui.LeftPanel.ResizeItem(tui.TemperaturesPanel.container, tui.TemperaturesPanel.GetRowCount()+2, 0)
+	tui.LeftPanel.ResizeItem(tui.ToolheadPanel.container, tui.ToolheadPanel.GetRowCount()+2, 0)
 }
 
 func (tui *TUI) removeServerUI() {
-	tui.LeftPanel.RemoveItem(tui.TemperaturesPanel.container)
-	tui.LeftPanel.RemoveItem(tui.ToolheadPanel.container)
+	tui.LeftPanel.ResizeItem(tui.TemperaturesPanel.container, 0, 0)
+	tui.LeftPanel.ResizeItem(tui.ToolheadPanel.container, 0, 0)
 }
 
 func (tui *TUI) hidePrintStatus() {

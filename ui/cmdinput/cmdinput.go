@@ -691,8 +691,14 @@ func (i *InputField) GetCursor() int {
 	return c
 }
 
-func (i *InputField) SetCursor(cursorPos int) {
-	i.textArea.Select(cursorPos, cursorPos)
+func (i *InputField) SetCursor(cursorPos int) *InputField {
+	i.Select(cursorPos, cursorPos)
+	return i
+}
+
+func (i *InputField) Select(start int, end int) *InputField {
+	i.textArea.Select(start, end)
+	return i
 }
 
 func (i *InputField) Clear() {

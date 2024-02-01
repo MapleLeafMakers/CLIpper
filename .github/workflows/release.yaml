@@ -26,6 +26,9 @@ jobs:
       - name: Set APP_VERSION env
         run: echo APP_VERSION=$(echo ${GITHUB_REF} | rev | cut -d'/' -f 1 | rev ) >> ${GITHUB_ENV}
 
+      - name: Set build time
+        run: echo NOW=$(date +%s) >> ${GITHUB_ENV}
+
       - uses: wangyoucao577/go-release-action@v1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
@@ -35,4 +38,4 @@ jobs:
           build_flags: -v
           binary_name: clipper
           extra_files: LICENSE.md README.md
-          ldflags: -X "main.buildVersion=${{ env.APP_VERSION }}" -X "main.buildCommit=${{ github.sha }}" -X "main.buildTime=$(date +%s)" -X "main.buildArch=${{ matrix.goos }}" -X "main.buildOS=${{ matrix.goarch }}"
+          ldflags: -X "main.buildVersion=${{ env.APP_VERSION }}" -X "main.buildCommit=${{ github.sha }}" -X "main.buildTime=${{ env.NOW }}" -X "main.buildArch=${{ matrix.goos }}" -X "main.buildOS=${{ matrix.goarch }}"

@@ -1,9 +1,9 @@
 package ui
 
 import (
+	"fmt"
 	"github.com/MapleLeafMakers/tview"
 	"github.com/gdamore/tcell/v2"
-	"log"
 	"sort"
 	"strconv"
 	"strings"
@@ -27,17 +27,26 @@ type TemperaturePanelContent struct {
 
 func (t TemperaturePanelContent) GetCell(row, column int) *tview.TableCell {
 	// TODO: this could be way more efficient by not recreating new cells every time.
+	selectable := t.sensors[row].Type == "heater_bed" || t.sensors[row].Type == "heater_generic" || t.sensors[row].Type == "extruder"
 	switch column {
 	case 0:
 		icon := getIcon(t.sensors[row].Type)
-		return tview.NewTableCell(" " + icon).SetSelectable(false)
+		return tview.NewTableCell(" " + icon).SetSelectable(selectable).SetClickedFunc(func() bool {
+			t.onSelected(row, column)
+			return false
+		})
 	case 1:
-		return tview.NewTableCell(t.sensors[row].DisplayName).SetExpansion(1).SetSelectable(false)
+		return tview.NewTableCell(t.sensors[row].DisplayName).SetExpansion(1).SetSelectable(selectable).SetClickedFunc(func() bool {
+			t.onSelected(row, column)
+			return false
+		})
 	case 2:
 		s := t.tui.State[t.sensors[row].StatusKey]
 		sensor := s
-		selectable := t.sensors[row].Type == "heater_bed" || t.sensors[row].Type == "heater_generic" || t.sensors[row].Type == "extruder"
-		return tview.NewTableCell(strconv.FormatFloat(sensor["temperature"].(float64), 'f', 1, 64) + "°C").SetAlign(tview.AlignRight).SetSelectable(selectable)
+		return tview.NewTableCell(strconv.FormatFloat(sensor["temperature"].(float64), 'f', 1, 64) + "°C").SetAlign(tview.AlignRight).SetSelectable(selectable).SetClickedFunc(func() bool {
+			t.onSelected(row, column)
+			return false
+		})
 	case 3:
 		s := t.tui.State[t.sensors[row].StatusKey]
 		sensor := s
@@ -48,9 +57,15 @@ func (t TemperaturePanelContent) GetCell(row, column int) *tview.TableCell {
 			if okActivity {
 				activityIcon = getHeaterActivityIcon(activity)
 			}
-			return tview.NewTableCell(strconv.Itoa(int(target.(float64))) + " " + activityIcon).SetAlign(tview.AlignRight).SetSelectable(false)
+			return tview.NewTableCell(strconv.Itoa(int(target.(float64))) + " " + activityIcon).SetAlign(tview.AlignRight).SetSelectable(selectable).SetClickedFunc(func() bool {
+				t.onSelected(row, column)
+				return false
+			})
 		} else {
-			return tview.NewTableCell("").SetSelectable(false)
+			return tview.NewTableCell("").SetSelectable(selectable).SetClickedFunc(func() bool {
+				t.onSelected(row, column)
+				return false
+			})
 		}
 	}
 	return nil
@@ -77,17 +92,18 @@ func NewTemperaturePanel(tui *TUI) *TemperaturePanelContent {
 		sensors:   sensors,
 		container: tview.NewFlex().SetDirection(tview.FlexRow),
 	}
-	table := tview.NewTable().SetSelectable(true, true)
-	table.SetSelectedStyle(tcell.StyleDefault.Foreground(AppConfig.Theme.PrimaryTextColor.Color()).Background(AppConfig.Theme.BackgroundColor.Color()))
+	table := tview.NewTable().SetSelectable(false, false)
+	table.SetSelectedStyle(tcell.Style{})
 
 	table.SetFocusFunc(func() {
-		log.Println("FocusTable")
-		table.SetSelectedStyle(tcell.Style{})
+		table.Select(0, 0)
+		table.SetSelectable(true, false)
+
 	})
 	table.SetBlurFunc(func() {
-		log.Println("Blurtable")
-		table.SetSelectedStyle(tcell.StyleDefault.Foreground(AppConfig.Theme.PrimaryTextColor.Color()).Background(AppConfig.Theme.BackgroundColor.Color()))
+		table.SetSelectable(false, false)
 	})
+	table.SetSelectedFunc(content.onSelected)
 	content.table = table
 	table.SetContent(content)
 	content.container.AddItem(table, 0, 1, true)
@@ -97,7 +113,6 @@ func NewTemperaturePanel(tui *TUI) *TemperaturePanelContent {
 
 func (t *TemperaturePanelContent) loadSensors() {
 	state := t.tui.State["heaters"]
-	log.Printf("State: %#v", state)
 	sensors_ := state["available_sensors"].([]interface{})
 	sensors := make([]string, len(sensors_))
 	for i, s := range sensors_ {
@@ -124,6 +139,22 @@ func (t *TemperaturePanelContent) loadSensors() {
 	}
 	t.sensors = results
 	t.table.SetContent(t)
+}
+
+func (t *TemperaturePanelContent) onSelected(row int, column int) {
+	go t.tui.promptForInput(fmt.Sprintf("Target temp for %s> ", t.sensors[row].DisplayName), "", func(entered bool, value string) {
+		if entered {
+			targetTemp, err := strconv.ParseFloat(value, 64)
+			if err != nil {
+
+				t.tui.Output.WriteError(err.Error())
+
+			} else {
+				heaterName := t.sensors[row].StatusKey
+				t.tui.ExecuteGcode(fmt.Sprintf("SET_HEATER_TEMPERATURE HEATER=\"%s\" TARGET=%.1f", heaterName, targetTemp))
+			}
+		}
+	})
 }
 
 func toDisplayName(key string) string {
