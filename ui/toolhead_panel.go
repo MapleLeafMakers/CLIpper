@@ -192,6 +192,9 @@ func (t *ToolheadPanelContent) buildMiscRow() []*tview.TableCell {
 	}))
 	cells = append(cells, tview.NewTableCell("").SetExpansion(1).SetSelectable(false))
 	cells = append(cells, tview.NewTableCell("").SetSelectable(false))
-	cells = append(cells, tview.NewTableCell("🏠 All"))
+	cells = append(cells, tview.NewTableCell("🏠 All").SetClickedFunc(func() bool {
+		t.homeAll()
+		return false
+	}))
 	return cells
 }

@@ -31,7 +31,7 @@ func NewPrintStatusPanel(tui *TUI) *PrintStatusPanelContent {
 
 	content.table.SetContent(content)
 	content.container.AddItem(content.table, 0, 1, false)
-	content.container.SetBorder(true).SetTitle("[P[]rint").SetBorderPadding(0, 0, 1, 1)
+	content.container.SetBorder(true).SetTitle("[P[]rint")
 	return &content
 }
 

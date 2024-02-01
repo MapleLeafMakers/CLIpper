@@ -321,6 +321,13 @@ func (tui *TUI) UpdateTheme() {
 			tui.TemperaturesPanel.container.SetBackgroundColor(tview.Styles.PrimitiveBackgroundColor)
 			tui.TemperaturesPanel.container.SetTitleColor(tview.Styles.TitleColor)
 		}
+
+		if tui.PrintStatusPanel != nil {
+			tui.PrintStatusPanel.container.SetBorderColor(tview.Styles.BorderColor)
+			tui.PrintStatusPanel.table.SetBackgroundColor(tview.Styles.PrimitiveBackgroundColor)
+			tui.PrintStatusPanel.container.SetBackgroundColor(tview.Styles.PrimitiveBackgroundColor)
+			tui.PrintStatusPanel.container.SetTitleColor(tview.Styles.TitleColor)
+		}
 	}
 
 }
@@ -423,8 +430,8 @@ func (tui *TUI) handleIncoming() {
 				}
 			}
 			tui.App.QueueUpdateDraw(func() {
-				for _, line := range params {
-					tui.Output.WriteResponse(line.(string))
+				for _, line := range filtered {
+					tui.Output.WriteResponse(line)
 				}
 			})
 
@@ -433,23 +440,16 @@ func (tui *TUI) handleIncoming() {
 			tui.ServerInfo.KlippyConnected = true
 			tui.ServerInfo.KlippyState = "ready"
 			go tui.loadServerInfo()
-			//go tui.loadPrinterInfo()
-			//go tui.loadGcodeHelp()
-			//go tui.subscribe()
 
 		case "notify_klippy_shutdown":
 			log.Println("notify_klippy_shutdown!")
 		case "notify_klippy_disconnected":
-			//tui.mu.Lock()
-			//tui.ServerInfo.KlippyConnected = false
-			//tui.ServerInfo.KlippyState = ""
-			//tui.mu.Unlock()
 			go tui.loadServerInfo()
 			tui.App.QueueUpdateDraw(func() {
 				tui.removeServerUI()
 			})
-
 			log.Println("notify_klippy_disconnected!")
+
 		case "notify_filelist_changed":
 		case "notify_update_response":
 		case "notify_update_refreshed":
@@ -589,6 +589,9 @@ func (tui *TUI) connectOnStartup() {
 
 func (tui *TUI) initializeServerUI() {
 	tui.TemperaturesPanel.loadSensors()
+	if tui.State["print_stats"]["state"] != "standby" {
+		tui.showPrintStatus()
+	}
 	tui.LeftPanel.ResizeItem(tui.TemperaturesPanel.container, tui.TemperaturesPanel.GetRowCount()+2, 0)
 	tui.LeftPanel.ResizeItem(tui.ToolheadPanel.container, tui.ToolheadPanel.GetRowCount()+2, 0)
 }
