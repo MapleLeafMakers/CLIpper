@@ -9,7 +9,7 @@ import (
 var stateIcons map[string]string = map[string]string{
 	"complete": "✓",
 	"paused":   "⏸",
-	"printing": "▶",
+	"printing": "⏵",
 	"error":    "⚠",
 	"standby":  "…",
 }

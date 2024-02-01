@@ -172,18 +172,18 @@ func (tui *TUI) buildLeftPanel() {
 	tui.HostHeader = NewHostHeader(tui)
 	tui.LeftPanel.AddItem(tui.HostHeader, 1, 1, false)
 
-	tui.TemperaturesPanel = NewTemperaturePanel(tui)
-	tui.LeftPanel.AddItem(tui.TemperaturesPanel.container, 0, 0, false)
-
-	tui.ToolheadPanel = NewToolheadPanel(tui)
-	tui.LeftPanel.AddItem(tui.ToolheadPanel.container, 0, 0, false)
-
 	tui.PrintStatusPanel = NewPrintStatusPanel(tui)
 	printStatusSize := 0
 	if state, ok := tui.State["print_stats"]["state"]; ok && state != "standby" {
 		printStatusSize = 2 + tui.PrintStatusPanel.GetRowCount()
 	}
 	tui.LeftPanel.AddItem(tui.PrintStatusPanel.container, printStatusSize, 0, false)
+
+	tui.TemperaturesPanel = NewTemperaturePanel(tui)
+	tui.LeftPanel.AddItem(tui.TemperaturesPanel.container, 0, 0, false)
+
+	tui.ToolheadPanel = NewToolheadPanel(tui)
+	tui.LeftPanel.AddItem(tui.ToolheadPanel.container, 0, 0, false)
 
 	tui.LeftPanelSpacer = tview.NewBox()
 	tui.LeftPanel.AddItem(tui.LeftPanelSpacer, 0, 1, false)
