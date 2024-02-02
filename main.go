@@ -10,29 +10,39 @@ import (
 	"log"
 	"net/url"
 	"os"
-	"strconv"
+	"runtime/debug"
 	"strings"
+	"time"
 )
 
-var buildVersion string = ""
-var buildTime string = ""
-var buildCommit = ""
-var buildArch = ""
-var buildOS = ""
+var buildVersion = "devel"
 
 var buildInfo = func() *build_info.BuildInfo {
-	bt, err := strconv.Atoi(buildTime)
-	if err != nil {
-		bt = 0
+	bi := build_info.BuildInfo{
+		VersionString: buildVersion,
+		BuildTime:     gostradamus.DateTimeFromTime(time.Now()),
 	}
 
-	return &build_info.BuildInfo{
-		BuildArch:     buildArch,
-		BuildOS:       buildOS,
-		VersionString: buildVersion,
-		CommitHash:    buildCommit[:min(len(buildCommit), 7)],
-		BuildTime:     gostradamus.FromUnixTimestamp(int64(bt)),
+	info, ok := debug.ReadBuildInfo()
+	if ok {
+		for _, s := range info.Settings {
+			switch s.Key {
+			case "GOARCH":
+				bi.BuildArch = s.Value
+			case "GOOS":
+				bi.BuildOS = s.Value
+			case "vcs.revision":
+				bi.CommitHash = s.Value[:min(len(s.Value), 7)]
+			case "vcs.time":
+				bt, err := time.Parse(time.RFC3339, s.Value)
+				if err == nil {
+					bi.BuildTime = gostradamus.DateTimeFromTime(bt)
+				}
+			}
+		}
 	}
+
+	return &bi
 }()
 
 func configureLogger() {

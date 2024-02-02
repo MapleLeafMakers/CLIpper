@@ -57,10 +57,10 @@ This can be as simple as:
 go build
 ```
     
-You can also include version and git commit information in the build using:
+You can also include version in the build using:
     
 ```shell
- go build -v -ldflags="-X main.buildCommit=$(git describe --always --long --dirty) -X main.buildVersion=v9.99.255 -X main.buildTime=$(date +%s) -X main.buildArch=$GOARCH -X main.buildOS=$GOOS"
+ go build -v -ldflags="-X main.buildVersion=v9.99.255"
 ```
 
 © 2024 MapleLeafMakers
