@@ -30,7 +30,7 @@ var buildInfo = func() *build_info.BuildInfo {
 		BuildArch:     buildArch,
 		BuildOS:       buildOS,
 		VersionString: buildVersion,
-		CommitHash:    buildCommit[:7],
+		CommitHash:    buildCommit[:min(len(buildCommit), 7)],
 		BuildTime:     gostradamus.FromUnixTimestamp(int64(bt)),
 	}
 }()
