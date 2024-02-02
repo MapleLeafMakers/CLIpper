@@ -1,6 +1,6 @@
 module clipper
 
-go 1.21.6
+go 1.21
 
 require (
 	github.com/MapleLeafMakers/tview v0.0.0-20240123022349-2a36953aef87

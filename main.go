@@ -30,7 +30,7 @@ var buildInfo = func() *build_info.BuildInfo {
 		BuildArch:     buildArch,
 		BuildOS:       buildOS,
 		VersionString: buildVersion,
-		CommitHash:    buildCommit[:7],
+		CommitHash:    buildCommit[:min(len(buildCommit), 7)],
 		BuildTime:     gostradamus.FromUnixTimestamp(int64(bt)),
 	}
 }()
@@ -78,7 +78,11 @@ func StartInteractive(serverUrl string) {
 
 func main() {
 	configureLogger()
-	ui.AppConfig.Load()
+	err := ui.AppConfig.Load()
+	if err != nil {
+		fmt.Println("could not load configuration:", err)
+		os.Exit(1)
+	}
 	log.Printf("%#v", ui.AppConfig)
 	args := os.Args[1:]
 	var url string
