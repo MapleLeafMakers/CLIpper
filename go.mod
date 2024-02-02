@@ -9,6 +9,7 @@ require (
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/gorilla/websocket v1.5.1
 	github.com/kirsle/configdir v0.0.0-20170128060238-e45d2f54772f
+	github.com/orsinium-labs/enum v1.3.0
 	github.com/rivo/uniseg v0.4.3
 	golang.org/x/mod v0.8.0
 )
