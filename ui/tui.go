@@ -150,8 +150,14 @@ func (tui *TUI) buildInput() {
 				if ok {
 					cmd2, ok2 := cmd.(cmdinput.Command)
 					if ok2 {
-
-						go cmd2.Call(ctx)
+						go func() {
+							err := cmd2.Call(ctx)
+							if err != nil {
+								tui.App.QueueUpdateDraw(func() {
+									tui.Output.WriteError(err.Error())
+								})
+							}
+						}()
 					}
 				} else {
 					//not a registered command, send it as gcode.

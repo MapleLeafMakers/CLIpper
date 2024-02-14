@@ -255,6 +255,8 @@ func (c Command_Connect) Call(ctx cmdinput.CommandContext) error {
 	tui, _ := ctx["tui"].(*TUI)
 	if tui.RpcClient.IsConnected {
 		return errors.New("Already connected.")
+	} else if tui.RpcClient.IsConnecting {
+		return errors.New("Connection attempt already in progress.")
 	} else {
 		raw := ctx["url"].(string)
 		if !strings.Contains("/", strings.ToLower(raw)) {

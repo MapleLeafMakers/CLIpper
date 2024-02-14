@@ -58,7 +58,7 @@ type RpcClient struct {
 func NewWebSocketClient(serverUrl *url.URL) *RpcClient {
 	return &RpcClient{
 		Url:              serverUrl,
-		shouldReconnect:  true,
+		shouldReconnect:  false,
 		Incoming:         make(chan JsonRPCRequest),
 		closeCh:          make(chan struct{}),
 		responseChannels: make(map[interface{}]chan JsonRPCResponse),
@@ -69,24 +69,23 @@ func (c *RpcClient) Connect() error {
 	c.mu.Lock()
 	c.IsConnecting = true
 	c.mu.Unlock()
-
+	c.shouldReconnect = true
 	conn, _, err := websocket.DefaultDialer.Dial(c.Url.String(), nil)
 	c.mu.Lock()
+	c.IsConnecting = false
 	if err != nil {
-		c.IsConnecting = false
 		c.mu.Unlock()
 		return err
 	}
-
-	c.conn = conn
-	c.IsConnected = true
-	c.reconnectAttempts = 0
-	c.mu.Unlock()
-
-	go c.readPump()
-	log.Println("Connected")
-	if c.onConnect != nil {
-		c.onConnect()
+	if !c.isClosed {
+		c.conn = conn
+		c.IsConnected = true
+		c.reconnectAttempts = 0
+		c.mu.Unlock()
+		go c.readPump()
+		if c.onConnect != nil {
+			c.onConnect()
+		}
 	}
 	return nil
 }
@@ -233,10 +232,10 @@ func (c *RpcClient) Close() {
 		return
 	} else {
 		c.isClosed = true
+		c.IsConnecting = false
+		c.shouldReconnect = false
 	}
 	c.mu.Unlock()
-
-	c.shouldReconnect = false
 	c.Disconnect()
 	if c.Incoming != nil {
 		close(c.Incoming)
