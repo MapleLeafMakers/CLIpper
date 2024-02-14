@@ -21,6 +21,9 @@ func (h HostHeaderContent) GetCell(row, column int) *tview.TableCell {
 	} else if h.tui.RpcClient.IsConnected {
 		text = "Klippy Not Ready"
 		bgColor = tcell.ColorOrange
+	} else if h.tui.RpcClient.IsConnecting {
+		text = "- Connecting... -"
+		bgColor = tcell.ColorOrange
 	} else {
 		text = "- Not Connected -"
 		bgColor = tcell.ColorRed

@@ -593,7 +593,9 @@ func (tui *TUI) connectOnStartup() {
 	if tui.RpcClient.Url != nil && !tui.RpcClient.IsConnected {
 		log.Printf("Connecting to %#v", tui.RpcClient.Url)
 		if err := tui.RpcClient.Connect(); err != nil {
-			log.Fatalf("Failed to connect: %v", err)
+			tui.App.QueueUpdateDraw(func() {
+				tui.Output.WriteError("Failed to connect to " + tui.RpcClient.Url.String())
+			})
 		}
 	} else if tui.RpcClient.IsConnected {
 		tui.initialize()

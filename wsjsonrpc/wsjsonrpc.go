@@ -42,6 +42,7 @@ type RpcClient struct {
 	respMu sync.Mutex
 
 	IsConnected       bool
+	IsConnecting      bool
 	shouldReconnect   bool
 	reconnectAttempts int
 	Incoming          chan JsonRPCRequest
@@ -65,13 +66,18 @@ func NewWebSocketClient(serverUrl *url.URL) *RpcClient {
 }
 
 func (c *RpcClient) Connect() error {
-	log.Println("Connecting to " + c.Url.String())
+	c.mu.Lock()
+	c.IsConnecting = true
+	c.mu.Unlock()
+
 	conn, _, err := websocket.DefaultDialer.Dial(c.Url.String(), nil)
+	c.mu.Lock()
 	if err != nil {
+		c.IsConnecting = false
+		c.mu.Unlock()
 		return err
 	}
 
-	c.mu.Lock()
 	c.conn = conn
 	c.IsConnected = true
 	c.reconnectAttempts = 0
