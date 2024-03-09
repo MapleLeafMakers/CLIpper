@@ -17,13 +17,13 @@ type MachineLimitValue struct {
 type MachineLimit enum.Member[MachineLimitValue]
 
 var (
-	b                    = enum.NewBuilder[MachineLimitValue, MachineLimit]()
-	Velocity             = b.Add(MachineLimit{Value: MachineLimitValue{DisplayName: "Velocity", ParamName: "VELOCITY", StatusKey: "max_velocity", Unit: "mm/s"}})
-	Acceleration         = b.Add(MachineLimit{Value: MachineLimitValue{DisplayName: "Acceleration", ParamName: "ACCEL", StatusKey: "max_accel", Unit: "mm/s²"}})
-	SquareCornerVelocity = b.Add(MachineLimit{Value: MachineLimitValue{DisplayName: "SCV", ParamName: "SQUARE_CORNER_VELOCITY", StatusKey: "square_corner_velocity", Unit: "mm/s"}})
-	AccelToDecel         = b.Add(MachineLimit{Value: MachineLimitValue{DisplayName: "Acce. to Decel", ParamName: "ACCEL_TO_DECEL", StatusKey: "max_accel_to_decel", Unit: "mm/s²"}})
+	machineLimitsBuilder = enum.NewBuilder[MachineLimitValue, MachineLimit]()
+	Velocity             = machineLimitsBuilder.Add(MachineLimit{Value: MachineLimitValue{DisplayName: "Velocity", ParamName: "VELOCITY", StatusKey: "max_velocity", Unit: "mm/s"}})
+	Acceleration         = machineLimitsBuilder.Add(MachineLimit{Value: MachineLimitValue{DisplayName: "Acceleration", ParamName: "ACCEL", StatusKey: "max_accel", Unit: "mm/s²"}})
+	SquareCornerVelocity = machineLimitsBuilder.Add(MachineLimit{Value: MachineLimitValue{DisplayName: "SCV", ParamName: "SQUARE_CORNER_VELOCITY", StatusKey: "square_corner_velocity", Unit: "mm/s"}})
+	AccelToDecel         = machineLimitsBuilder.Add(MachineLimit{Value: MachineLimitValue{DisplayName: "Acce. to Decel", ParamName: "ACCEL_TO_DECEL", StatusKey: "max_accel_to_decel", Unit: "mm/s²"}})
 
-	MachineLimits = b.Enum()
+	MachineLimits = machineLimitsBuilder.Enum()
 )
 
 type MachineLimitPanelContent struct {
