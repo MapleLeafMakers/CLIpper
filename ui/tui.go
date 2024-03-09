@@ -29,6 +29,7 @@ type TUI struct {
 	HostHeader        *tview.Table
 	TemperaturesPanel *TemperaturePanelContent
 	ToolheadPanel     *ToolheadPanelContent
+	ExtruderPanel     *ExtruderPanelContent
 	PrintStatusPanel  *PrintStatusPanelContent
 	MachineLimitPanel *MachineLimitPanelContent
 	hostname          string
@@ -69,6 +70,8 @@ func NewTUI(rpcClient *wsjsonrpc.RpcClient, buildInfo *build_info.BuildInfo) *TU
 			tui.SwitchFocus(tui.TemperaturesPanel.container)
 		case tcell.KeyCtrlO:
 			tui.SwitchFocus(tui.ToolheadPanel.container)
+		case tcell.KeyCtrlE:
+			tui.SwitchFocus(tui.ExtruderPanel.container)
 		case tcell.KeyCtrlL:
 			tui.SwitchFocus(tui.MachineLimitPanel.container)
 		case tcell.KeyCtrlC:
@@ -193,6 +196,9 @@ func (tui *TUI) buildLeftPanel() {
 
 	tui.ToolheadPanel = NewToolheadPanel(tui)
 	tui.LeftPanel.AddItem(tui.ToolheadPanel.container, 0, 0, false)
+
+	tui.ExtruderPanel = NewExtruderPanel(tui)
+	tui.LeftPanel.AddItem(tui.ExtruderPanel.container, 0, 0, false)
 
 	tui.MachineLimitPanel = NewMachineLimitPanel(tui)
 	tui.LeftPanel.AddItem(tui.MachineLimitPanel.container, 0, 0, false)
@@ -346,6 +352,13 @@ func (tui *TUI) UpdateTheme() {
 			tui.MachineLimitPanel.table.SetBackgroundColor(tview.Styles.PrimitiveBackgroundColor)
 			tui.MachineLimitPanel.container.SetBackgroundColor(tview.Styles.PrimitiveBackgroundColor)
 			tui.MachineLimitPanel.container.SetTitleColor(tview.Styles.TitleColor)
+		}
+
+		if tui.ExtruderPanel != nil {
+			tui.ExtruderPanel.container.SetBorderColor(tview.Styles.BorderColor)
+			tui.ExtruderPanel.container.SetBackgroundColor(tview.Styles.PrimitiveBackgroundColor)
+			tui.ExtruderPanel.table.SetBackgroundColor(tview.Styles.PrimitiveBackgroundColor)
+			tui.ExtruderPanel.container.SetTitleColor(tview.Styles.TitleColor)
 		}
 	}
 
@@ -615,12 +628,14 @@ func (tui *TUI) initializeServerUI() {
 	}
 	tui.LeftPanel.ResizeItem(tui.TemperaturesPanel.container, tui.TemperaturesPanel.GetRowCount()+2, 0)
 	tui.LeftPanel.ResizeItem(tui.ToolheadPanel.container, tui.ToolheadPanel.GetRowCount()+2, 0)
-	tui.LeftPanel.ResizeItem(tui.MachineLimitPanel.container, tui.ToolheadPanel.GetRowCount()+2, 0)
+	tui.LeftPanel.ResizeItem(tui.ExtruderPanel.container, tui.ExtruderPanel.GetRowCount()+2, 0)
+	tui.LeftPanel.ResizeItem(tui.MachineLimitPanel.container, tui.MachineLimitPanel.GetRowCount()+2, 0)
 }
 
 func (tui *TUI) removeServerUI() {
 	tui.LeftPanel.ResizeItem(tui.TemperaturesPanel.container, 0, 0)
 	tui.LeftPanel.ResizeItem(tui.ToolheadPanel.container, 0, 0)
+	tui.LeftPanel.ResizeItem(tui.ExtruderPanel.container, 0, 0)
 	tui.LeftPanel.ResizeItem(tui.MachineLimitPanel.container, 0, 0)
 }
 
